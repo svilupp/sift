@@ -7,7 +7,7 @@
 
 **Search Index for Finding Things** — local-first hybrid search for personal knowledge files.
 
-SIFT combines BM25 keyword search, vector embeddings, and neural reranking to find what you need across markdown, plaintext, and JSONL files. Inspired by [Query Markdown (QMD)](https://github.com/jsiml/qmd), built for personal memory retrieval.
+SIFT combines BM25 keyword search, vector embeddings, and neural reranking to find what you need across markdown, plaintext, and JSONL files. Inspired by [Query Markup Documents (QMD)](https://github.com/tobi/qmd), but built for personal memory retrieval.
 
 ## What Makes SIFT Different
 
