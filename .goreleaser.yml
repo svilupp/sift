@@ -1,0 +1,33 @@
+version: 2
+
+builds:
+  - main: ./cmd/sift
+    binary: sift
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -X main.version={{.Version}} -X main.commit={{.ShortCommit}} -X main.buildTime={{.Date}}
+
+archives:
+  - format: tar.gz
+    files:
+      - LICENSE
+      - README.md
+
+changelog:
+  filters:
+    exclude:
+      - "^docs:"
+      - "^ci:"
+      - "^chore:"
+
+release:
+  github:
+    owner: svilupp
+    name: sift
