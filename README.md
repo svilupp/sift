@@ -80,19 +80,20 @@ See the [architecture docs](https://svilupp.github.io/sift/architecture/) for th
 
 ## Installation
 
-### Binary
-
-Download from the [releases page](https://github.com/svilupp/sift/releases).
-
-### From source
+### Quick install (macOS/Linux)
 
 ```bash
-git clone https://github.com/svilupp/sift.git
-cd sift
-make install
+curl -fsSL https://zyedidia.github.io/eget.sh | sh       # install eget (GitHub binary manager)
+eget svilupp/sift --to /usr/local/bin/sift                 # install sift
 ```
 
-> **Note**: `go install github.com/svilupp/sift/cmd/sift@latest` will work once the module path is updated to `github.com/svilupp/sift`. For now, install from source or download a binary.
+> [eget](https://github.com/zyedidia/eget) downloads the right binary for your OS/arch from GitHub releases automatically.
+
+### Other options
+
+- **Homebrew eget**: `brew install eget && eget svilupp/sift --to /usr/local/bin/sift`
+- **Direct download**: grab a binary from the [releases page](https://github.com/svilupp/sift/releases)
+- **From source**: `git clone https://github.com/svilupp/sift.git && cd sift && make install`
 
 ## Documentation
 
