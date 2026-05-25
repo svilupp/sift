@@ -31,6 +31,7 @@ sift refresh
 # Search
 sift search "authentication flow"
 sift search "rate limiting" --pretty
+sift search "architecture" --agent --read-command "mem read"  # wrapper-friendly hint override
 ```
 
 ## Output Modes
@@ -40,6 +41,7 @@ sift search <query>           # Default: AI-optimized (for piping to agents)
 sift search <query> --pretty  # Human-readable with colors and editor commands
 sift search <query> --json    # Machine-readable with full score components
 sift search <query> --files   # Just file paths (good for xargs/piping)
+sift search <query> --agent --read-command "mem read"  # Wrapper can override drill-down hint
 ```
 
 **Default mode** returns 20 results, ordered best-first. Designed for AI agents that read from the top.
@@ -52,6 +54,21 @@ sift search <query> --files   # Just file paths (good for xargs/piping)
 
 Both defaults can be overridden: `--top-k 5` sets an explicit count, `--reverse=false` disables reverse ordering.
 
+## File Search
+
+Search within specific files at line granularity — no indexing or API calls needed:
+
+```
+sift search "store id" --file INFRASTRUCTURE.md        # Single file
+sift search "auth flow" --file a.md --file b.md        # Multiple files (parallel)
+cat rendered.md | sift search "cache" --file -          # From stdin
+sift search "config" --file config.md --pretty          # With context lines
+```
+
+File search creates an ephemeral in-memory BM25 index, searches at individual line
+granularity, and returns exact line numbers. Useful for large reference files where
+you need precise lookup without full collection indexing.
+
 ## How It Works
 
 Every query runs BM25 and vector search in parallel, then merges results:
@@ -63,20 +80,24 @@ Every query runs BM25 and vector search in parallel, then merges results:
 5. **Scoring** — `base * (1 + recency) * feedback_boost * path_boost`
 6. **Adaptive top-K** — score-cliff detection between positions 1-5
 
-See the [architecture docs](https://svilupp.github.io/sift/architecture/) for the full pipeline details.
+See [CLAUDE.md](CLAUDE.md) for the full pipeline details.
 
 ## Features
 
 - Hybrid search: BM25 + vector + RRF fusion + reranking
+- Folder indexes (`sift.toml`): committed per-folder metadata with optional LLM-generated `purpose`/`use_when`/`summary`; results are decorated with folder context by default
 - Smart previews centered on BM25 keyword matches
 - Adaptive top-K with score-cliff detection
 - Content deduplication with "Also in:" references
+- Frontmatter-aware chunking (YAML `---`, TOML `+++`); titles derived from frontmatter or H1/H2
 - Feedback-based scoring (`sift feedback <id> --positive a,b --negative c`)
 - Token-aware batch embedding with dead letter queue for resilience
 - `.siftignore` for gitignore-style file filtering per collection
 - Pure Go — no CGo, single binary (`modernc.org/sqlite`)
+- File search: `--file` flag for line-level BM25 within specific files (no indexing needed)
 - Works without API key (BM25-only mode)
 - Configurable via `~/.sift/config.toml`
+- Optional background daemon keeps the index and TLS connection warm — repeated queries drop from ~3-5 s to sub-second (auto-spawned, no setup)
 
 ## Installation
 
@@ -102,8 +123,40 @@ Full documentation at **[svilupp.github.io/sift](https://svilupp.github.io/sift/
 - [Getting Started](https://svilupp.github.io/sift/getting-started/) — install, configure, first search
 - [Configuration](https://svilupp.github.io/sift/configuration/) — full `config.toml` reference
 - [Architecture](https://svilupp.github.io/sift/architecture/) — search pipeline, scoring, feedback loop
+- [Power Workflows](https://svilupp.github.io/sift/power-workflows/) — search loops, links, anchors, refs, and linting
 - [CLI Reference](https://svilupp.github.io/sift/cli-reference/) — every command and flag
+- [Folder Indexes](https://svilupp.github.io/sift/folder-indexes/overview/) — `sift.toml`, `sift index`, agent usage
+- [Daemon](https://svilupp.github.io/sift/daemon/) — optional warm-process for sub-second repeated queries
 - [.siftignore](https://svilupp.github.io/sift/siftignore/) — exclude files from indexing
+
+In-repo references:
+
+- [`.claude/skills/using-sift-effectively/SKILL.md`](.claude/skills/using-sift-effectively/SKILL.md) — Claude Code skill (auto-loads when working inside this repo) covering search, feedback, links, refs, and lint workflows
+- [CLAUDE.md](CLAUDE.md) — architecture and code map
+- [CHANGELOG.md](CHANGELOG.md) — release notes
+
+## Maintenance
+
+### Full Re-index
+
+After changing chunking strategy, header parsing, or any logic that affects how files are split into chunks, run a full re-index to rebuild everything from scratch:
+
+```bash
+sift refresh --full
+```
+
+This bypasses all hash/mtime checks and for every file: deletes old chunks, re-chunks with current settings, rebuilds BM25, and re-generates embeddings. No purge needed.
+
+### Other Commands
+
+```bash
+sift refresh                    # incremental (only changed files)
+sift refresh -c vault           # single collection
+sift refresh --dry-run          # preview what would change
+sift config purge               # nuclear option: delete all data
+sift config purge -c vault      # delete one collection's data
+sift config rebuild-bm25        # rebuild BM25 index from existing DB chunks
+```
 
 ## Development
 

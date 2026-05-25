@@ -794,3 +794,229 @@ func TestBuildContentWithOverlap(t *testing.T) {
 		})
 	}
 }
+
+func TestFromLinesWithYAMLFrontmatter(t *testing.T) {
+	lines := []string{
+		"---",
+		"title: My Document",
+		"tags: [a, b]",
+		"---",
+		"# Heading",
+	}
+	// Add enough body lines to form a chunk.
+	for i := 0; i < 20; i++ {
+		lines = append(lines, fmt.Sprintf("Body line %d with enough content to pass filters", i+1))
+	}
+
+	opts := Options{
+		RowsPerChunk:  100,
+		OverlapRows:   0,
+		MinChunkChars: 0,
+		SkipEmptyRows: true,
+	}
+
+	chunks := FromLines(lines, opts)
+	if len(chunks) < 2 {
+		t.Fatalf("got %d chunks, want at least 2 (frontmatter + body)", len(chunks))
+	}
+
+	// Chunk 0 should be frontmatter.
+	fm := chunks[0]
+	if !fm.IsFrontmatter {
+		t.Error("chunk[0].IsFrontmatter = false, want true")
+	}
+	if fm.Order != 0 {
+		t.Errorf("chunk[0].Order = %d, want 0", fm.Order)
+	}
+	if fm.StartLine != 1 {
+		t.Errorf("chunk[0].StartLine = %d, want 1", fm.StartLine)
+	}
+	if fm.EndLine != 4 {
+		t.Errorf("chunk[0].EndLine = %d, want 4", fm.EndLine)
+	}
+	if fm.Content != "title: My Document\ntags: [a, b]" {
+		t.Errorf("chunk[0].Content = %q, want frontmatter raw text", fm.Content)
+	}
+
+	// Body chunk should start at Order 1.
+	body := chunks[1]
+	if body.IsFrontmatter {
+		t.Error("chunk[1].IsFrontmatter = true, want false")
+	}
+	if body.Order != 1 {
+		t.Errorf("chunk[1].Order = %d, want 1", body.Order)
+	}
+	// Body starts after the closing delimiter (line 5 in original file).
+	if body.StartLine != 5 {
+		t.Errorf("chunk[1].StartLine = %d, want 5", body.StartLine)
+	}
+}
+
+func TestFromLinesWithTOMLFrontmatter(t *testing.T) {
+	lines := []string{
+		"+++",
+		"title = \"Hello\"",
+		"+++",
+		"Content line 1 with enough text to be a real chunk",
+		"Content line 2 with enough text to be a real chunk",
+	}
+
+	opts := Options{
+		RowsPerChunk:  100,
+		OverlapRows:   0,
+		MinChunkChars: 0,
+		SkipEmptyRows: false,
+	}
+
+	chunks := FromLines(lines, opts)
+	if len(chunks) != 2 {
+		t.Fatalf("got %d chunks, want 2", len(chunks))
+	}
+
+	if !chunks[0].IsFrontmatter {
+		t.Error("chunk[0] should be frontmatter")
+	}
+	if chunks[0].Content != "title = \"Hello\"" {
+		t.Errorf("chunk[0].Content = %q", chunks[0].Content)
+	}
+	if chunks[1].IsFrontmatter {
+		t.Error("chunk[1] should not be frontmatter")
+	}
+}
+
+func TestFromLinesFrontmatterOnlyNoBody(t *testing.T) {
+	lines := []string{"---", "title: Test", "---"}
+
+	opts := Options{
+		RowsPerChunk:  100,
+		OverlapRows:   0,
+		MinChunkChars: 0,
+		SkipEmptyRows: true,
+	}
+
+	chunks := FromLines(lines, opts)
+	if len(chunks) != 1 {
+		t.Fatalf("got %d chunks, want 1 (frontmatter only)", len(chunks))
+	}
+	if !chunks[0].IsFrontmatter {
+		t.Error("chunk[0] should be frontmatter")
+	}
+	if chunks[0].Content != "title: Test" {
+		t.Errorf("chunk[0].Content = %q, want %q", chunks[0].Content, "title: Test")
+	}
+}
+
+func TestFromLinesNoFrontmatterUnchanged(t *testing.T) {
+	lines := makeLines(t, 50)
+	opts := Options{
+		RowsPerChunk:  45,
+		OverlapRows:   5,
+		MinChunkChars: 0,
+		SkipEmptyRows: true,
+	}
+
+	chunks := FromLines(lines, opts)
+	// No frontmatter: should behave exactly as before.
+	if len(chunks) != 2 {
+		t.Fatalf("got %d chunks, want 2", len(chunks))
+	}
+	for _, c := range chunks {
+		if c.IsFrontmatter {
+			t.Error("no chunk should be frontmatter")
+		}
+	}
+	assertChunkOrder(t, chunks)
+}
+
+func TestFileWithFrontmatter(t *testing.T) {
+	dir := t.TempDir()
+	var lines []string
+	lines = append(lines, "---", "title: File Test", "tags: [x]", "---")
+	for i := 0; i < 30; i++ {
+		lines = append(lines, fmt.Sprintf("Body line %d with sufficient content for chunking", i+1))
+	}
+	path := writeTempFile(t, dir, "frontmatter.md", lines)
+
+	opts := Options{
+		RowsPerChunk:  100,
+		OverlapRows:   0,
+		MinChunkChars: 0,
+		SkipEmptyRows: true,
+	}
+
+	chunks, err := File(path, opts)
+	if err != nil {
+		t.Fatalf("File() error: %v", err)
+	}
+	if len(chunks) < 2 {
+		t.Fatalf("got %d chunks, want at least 2", len(chunks))
+	}
+	if !chunks[0].IsFrontmatter {
+		t.Error("first chunk should be frontmatter")
+	}
+	if chunks[0].Content != "title: File Test\ntags: [x]" {
+		t.Errorf("frontmatter content = %q", chunks[0].Content)
+	}
+}
+
+func TestExtractTitleFrontmatterOverHeading(t *testing.T) {
+	lines := []string{
+		"---",
+		"title: From Frontmatter",
+		"---",
+		"# From Heading",
+		"Body text",
+	}
+
+	got := ExtractTitle(lines)
+	if got != "From Frontmatter" {
+		t.Errorf("ExtractTitle() = %q, want %q", got, "From Frontmatter")
+	}
+}
+
+func TestExtractTitleFrontmatterFallbackToHeading(t *testing.T) {
+	lines := []string{
+		"---",
+		"description: No title here",
+		"---",
+		"# Heading Title",
+		"Body text",
+	}
+
+	got := ExtractTitle(lines)
+	if got != "Heading Title" {
+		t.Errorf("ExtractTitle() = %q, want %q", got, "Heading Title")
+	}
+}
+
+func TestFrontmatterBodyLineNumbers(t *testing.T) {
+	// Verify that body chunk line numbers reference original file positions.
+	lines := []string{
+		"---",         // line 1
+		"title: Test", // line 2
+		"---",         // line 3
+		"Body line 1", // line 4
+		"Body line 2", // line 5
+		"Body line 3", // line 6
+	}
+
+	opts := Options{
+		RowsPerChunk:  100,
+		OverlapRows:   0,
+		MinChunkChars: 0,
+		SkipEmptyRows: false,
+	}
+
+	chunks := FromLines(lines, opts)
+	if len(chunks) != 2 {
+		t.Fatalf("got %d chunks, want 2", len(chunks))
+	}
+
+	body := chunks[1]
+	if body.StartLine != 4 {
+		t.Errorf("body StartLine = %d, want 4", body.StartLine)
+	}
+	if body.EndLine != 6 {
+		t.Errorf("body EndLine = %d, want 6", body.EndLine)
+	}
+}

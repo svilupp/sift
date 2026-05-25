@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -10,9 +11,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"sift/internal/bm25"
 	"sift/internal/config"
 	"sift/internal/db"
-	"sift/internal/index"
 )
 
 func newCollectionsCmd() *cobra.Command {
@@ -140,33 +141,21 @@ func newCollectionsRemoveCmd() *cobra.Command {
 				return err
 			}
 			if _, statErr := os.Stat(blevePath); statErr == nil {
-				bleveIdx, err := index.OpenBleve(blevePath, cfg.BM25.Analyzer)
+				bleveIdx, err := bm25.OpenBleve(blevePath, cfg.BM25.Analyzer)
 				if err != nil {
 					return fmt.Errorf("open bleve: %w", err)
 				}
 				defer bleveIdx.Close()
 
-				files, err := database.GetFilesByCollection(col.ID)
-				if err != nil {
-					return fmt.Errorf("get files: %w", err)
-				}
-				for _, f := range files {
-					chunks, err := database.GetChunksByFile(f.ID)
-					if err != nil {
-						fmt.Fprintf(cmd.ErrOrStderr(), "Warning: get chunks for %s: %v\n", f.Path, err)
-						continue
-					}
-					for _, c := range chunks {
-						if err := bleveIdx.Delete(strconv.FormatInt(c.ID, 10)); err != nil {
-							fmt.Fprintf(cmd.ErrOrStderr(), "Warning: bleve delete: %v\n", err)
-						}
-					}
+				if err := deleteOrphanBleveDocsForCollection(database, bleveIdx, col.ID, cmd.ErrOrStderr()); err != nil {
+					return err
 				}
 			}
 
 			if err := database.RemoveCollection(name); err != nil {
 				return err
 			}
+			_ = database.ClearCache()
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Removed collection %q\n", name)
 			return nil
@@ -216,5 +205,39 @@ func openDB() (*db.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
+	if err := database.Init(); err != nil {
+		_ = database.Close()
+		return nil, fmt.Errorf("init db schema: %w", err)
+	}
 	return database, nil
+}
+
+func deleteOrphanBleveDocsForCollection(database *db.DB, bleveIdx *bm25.BleveIndex, collectionID int64, errW io.Writer) error {
+	files, err := database.GetFilesByCollection(collectionID)
+	if err != nil {
+		return fmt.Errorf("get files: %w", err)
+	}
+
+	for _, f := range files {
+		memberships, err := database.GetFileCollectionIDs(f.ID)
+		if err != nil {
+			return fmt.Errorf("get file memberships for %s: %w", f.Path, err)
+		}
+		if len(memberships) > 1 {
+			continue
+		}
+
+		chunks, err := database.GetChunksByFile(f.ID)
+		if err != nil {
+			fmt.Fprintf(errW, "Warning: get chunks for %s: %v\n", f.Path, err)
+			continue
+		}
+		for _, c := range chunks {
+			if err := bleveIdx.Delete(strconv.FormatInt(c.ID, 10)); err != nil {
+				fmt.Fprintf(errW, "Warning: bleve delete: %v\n", err)
+			}
+		}
+	}
+
+	return nil
 }

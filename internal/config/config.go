@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	toml "github.com/pelletier/go-toml/v2"
 )
@@ -15,15 +17,53 @@ type Config struct {
 	Reranking RerankingConfig `toml:"reranking"`
 	Chunking  ChunkingConfig  `toml:"chunking"`
 	Search    SearchConfig    `toml:"search"`
+	Agent     AgentConfig     `toml:"agent"`
 	Scoring   ScoringConfig   `toml:"scoring"`
 	BM25      BM25Config      `toml:"bm25"`
 	Output    OutputConfig    `toml:"output"`
 	Logs      LogsConfig      `toml:"logs"`
 	Cache     CacheConfig     `toml:"cache"`
+	Daemon    DaemonConfig    `toml:"daemon"`
+	Transport TransportConfig `toml:"transport"`
+}
+
+// DaemonConfig governs the optional sift daemon process: whether it is
+// enabled, when it self-exits after idleness, and the timeouts the CLI
+// uses when spawning / dialing it.
+type DaemonConfig struct {
+	Enabled bool `toml:"enabled"`
+	// IdleTimeout: how long the daemon stays alive with no requests
+	// before exiting. Zero (empty string or "0") means never exit.
+	IdleTimeout Duration `toml:"idle_timeout"`
+	// SpawnTimeout: how long a CLI invocation waits for a freshly
+	// spawned daemon to become reachable before falling back.
+	SpawnTimeout Duration `toml:"spawn_timeout"`
+	// DialTimeout: how long the CLI waits when dialing the unix socket
+	// of an already-running daemon before treating it as unreachable.
+	DialTimeout Duration `toml:"dial_timeout"`
+}
+
+// IdleTimeoutDuration is a convenience accessor returning the idle
+// timeout as a time.Duration. Zero means "never exit".
+func (d *DaemonConfig) IdleTimeoutDuration() time.Duration {
+	return d.IdleTimeout.D()
+}
+
+// TransportConfig tunes the shared *http.Transport used by upstream
+// API clients (e.g. Voyage). Each field corresponds to the same-named
+// field on http.Transport.
+type TransportConfig struct {
+	MaxIdleConns          int      `toml:"max_idle_conns"`
+	MaxIdleConnsPerHost   int      `toml:"max_idle_conns_per_host"`
+	MaxConnsPerHost       int      `toml:"max_conns_per_host"`
+	IdleConnTimeout       Duration `toml:"idle_conn_timeout"`
+	TLSHandshakeTimeout   Duration `toml:"tls_handshake_timeout"`
+	ResponseHeaderTimeout Duration `toml:"response_header_timeout"`
 }
 
 type APIConfig struct {
 	VoyageAPIKey       string `toml:"voyage_api_key"`
+	DeepInfraAPIKey    string `toml:"deepinfra_api_key"`
 	RequestTimeoutSecs int    `toml:"request_timeout_seconds"`
 }
 
@@ -43,10 +83,13 @@ type RerankingConfig struct {
 }
 
 type ChunkingConfig struct {
-	RowsPerChunk  int  `toml:"rows_per_chunk"`
-	OverlapRows   int  `toml:"overlap_rows"`
-	MinChunkChars int  `toml:"min_chunk_chars"`
-	SkipEmptyRows bool `toml:"skip_empty_rows"`
+	Mode            string `toml:"mode"` // "row" or "section" (default: "row")
+	RowsPerChunk    int    `toml:"rows_per_chunk"`
+	OverlapRows     int    `toml:"overlap_rows"`
+	MinChunkChars   int    `toml:"min_chunk_chars"`
+	SkipEmptyRows   bool   `toml:"skip_empty_rows"`
+	MaxSectionChars int    `toml:"max_section_chars"` // for section mode (default: 2000)
+	MinSectionChars int    `toml:"min_section_chars"` // for section mode (default: 100)
 }
 
 type SearchConfig struct {
@@ -64,6 +107,12 @@ type SearchConfig struct {
 	AdaptiveMaxK          int     `toml:"adaptive_max_k"`
 	Threshold             float64 `toml:"threshold"`
 	DedupIdenticalContent bool    `toml:"dedup_identical_content"`
+	IncludeLinks          bool    `toml:"include_links"` // return links in results (default: true)
+}
+
+type AgentConfig struct {
+	PreviewChars int    `toml:"preview_chars"`
+	Hint         string `toml:"hint"`
 }
 
 type CacheConfig struct {
@@ -76,6 +125,11 @@ type ScoringConfig struct {
 	RecencyWeight       float64     `toml:"recency_weight"`
 	RecencyHalfLifeDays int         `toml:"recency_half_life_days"`
 	FeedbackEnabled     bool        `toml:"feedback_enabled"`
+	BacklinkWeight      float64     `toml:"backlink_weight"`
+	ReadSignalEnabled   bool        `toml:"read_signal_enabled"`
+	ReadSignalWeight    float64     `toml:"read_signal_weight"`
+	ReadSignalPath      string      `toml:"read_signal_path"`
+	ReadSignalDays      int         `toml:"read_signal_days"`
 	PathBoosts          []PathBoost `toml:"path_boost"`
 }
 
@@ -120,10 +174,13 @@ func Default() *Config {
 			TopN:    75,
 		},
 		Chunking: ChunkingConfig{
-			RowsPerChunk:  25,
-			OverlapRows:   5,
-			MinChunkChars: 200,
-			SkipEmptyRows: true,
+			Mode:            "section",
+			RowsPerChunk:    25,
+			OverlapRows:     5,
+			MinChunkChars:   200,
+			SkipEmptyRows:   true,
+			MaxSectionChars: 2000,
+			MinSectionChars: 100,
 		},
 		Search: SearchConfig{
 			DefaultTopK:           20,
@@ -140,11 +197,21 @@ func Default() *Config {
 			AdaptiveMaxK:          20,
 			Threshold:             0.40,
 			DedupIdenticalContent: true,
+			IncludeLinks:          true,
+		},
+		Agent: AgentConfig{
+			PreviewChars: 200,
+			Hint:         "",
 		},
 		Scoring: ScoringConfig{
 			RecencyWeight:       0.2,
 			RecencyHalfLifeDays: 30,
 			FeedbackEnabled:     true,
+			BacklinkWeight:      0.1,
+			ReadSignalEnabled:   true,
+			ReadSignalWeight:    0.05,
+			ReadSignalPath:      "memory/.read-signals.tsv",
+			ReadSignalDays:      14,
 		},
 		BM25: BM25Config{
 			Analyzer: "standard",
@@ -160,6 +227,20 @@ func Default() *Config {
 			Enabled:    true,
 			TTLSeconds: 300,
 			MaxEntries: 100,
+		},
+		Daemon: DaemonConfig{
+			Enabled:      true,
+			IdleTimeout:  Duration(30 * time.Minute),
+			SpawnTimeout: Duration(300 * time.Millisecond),
+			DialTimeout:  Duration(50 * time.Millisecond),
+		},
+		Transport: TransportConfig{
+			MaxIdleConns:          16,
+			MaxIdleConnsPerHost:   8,
+			MaxConnsPerHost:       16,
+			IdleConnTimeout:       Duration(5 * time.Minute),
+			TLSHandshakeTimeout:   Duration(5 * time.Second),
+			ResponseHeaderTimeout: Duration(30 * time.Second),
 		},
 	}
 }
@@ -219,6 +300,71 @@ func LockPath() (string, error) {
 		return "", err
 	}
 	return filepath.Join(dir, ".lock"), nil
+}
+
+// SocketPath returns the path to the daemon's unix socket.
+//
+// If SIFT_DAEMON_SOCKET is set it overrides the default location; the
+// override applies to BOTH the server (listen) side and the client
+// (dial) side, so they can never disagree. A warning is logged via
+// log/slog when the override is used and differs from the default,
+// since it tends to be the source of "daemon not reachable" surprises.
+func SocketPath() (string, error) {
+	dir, err := Dir()
+	if err != nil {
+		return "", err
+	}
+	def := filepath.Join(dir, "sift.sock")
+	if override := os.Getenv("SIFT_DAEMON_SOCKET"); override != "" {
+		if override != def {
+			slog.Warn("SIFT_DAEMON_SOCKET overrides default socket path",
+				"override", override,
+				"default", def,
+			)
+		}
+		return override, nil
+	}
+	return def, nil
+}
+
+// PIDPath returns the path to the daemon's PID file.
+func PIDPath() (string, error) {
+	dir, err := Dir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "sift.pid"), nil
+}
+
+// DaemonLogPath returns the path to the daemon's log file
+// (~/.sift/logs/daemon.log). The parent logs/ directory is created
+// lazily by the logger that opens this file (see internal/log).
+func DaemonLogPath() (string, error) {
+	logDir, err := LogDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(logDir, "daemon.log"), nil
+}
+
+// RefreshIndexPIDPath returns the path used by `sift refresh
+// --detach` to track its background child.
+func RefreshIndexPIDPath() (string, error) {
+	dir, err := Dir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "refresh-index.pid"), nil
+}
+
+// RefreshIndexLogPath returns the path used by `sift refresh --detach`
+// for stdout/stderr redirection.
+func RefreshIndexLogPath() (string, error) {
+	logDir, err := LogDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(logDir, "refresh-index.jsonl"), nil
 }
 
 // Load reads config from disk, returning defaults if file doesn't exist.

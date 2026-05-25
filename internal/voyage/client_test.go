@@ -2,13 +2,31 @@ package voyage
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
+
+// fastRetry returns a retryConfig with minimal delays for testing.
+func fastRetry() *retryConfig {
+	return &retryConfig{
+		maxRetries:     5,
+		initialBackoff: 1 * time.Millisecond,
+		maxBackoff:     10 * time.Millisecond,
+	}
+}
 
 func TestEmbed(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -162,6 +180,7 @@ func TestRetryOn429(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClientWithBaseURL("test-key", srv.URL)
+	c.retryOverride = fastRetry()
 	vectors, _, err := c.Embed(context.Background(), []string{"hello"}, "document")
 	if err != nil {
 		t.Fatalf("expected success after retries, got: %v", err)
@@ -171,6 +190,51 @@ func TestRetryOn429(t *testing.T) {
 	}
 	if got := attempts.Load(); got != 3 {
 		t.Errorf("expected 3 attempts, got %d", got)
+	}
+}
+
+func TestRetryOn429WithRetryAfter(t *testing.T) {
+	var attempts atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := attempts.Add(1)
+		if n <= 1 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			if _, err := w.Write([]byte(`{"error":"rate limited"}`)); err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			return
+		}
+		resp := embedResponse{
+			Data:  []embeddingData{{Embedding: []float32{1.0}, Index: 0}},
+			Usage: Usage{TotalTokens: 10},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+	}))
+	defer srv.Close()
+
+	c := NewClientWithBaseURL("test-key", srv.URL)
+	// Use fast retry but note Retry-After will override the backoff to 1s.
+	// We use a short override so the test doesn't actually wait 1s.
+	c.retryOverride = &retryConfig{
+		maxRetries:     5,
+		initialBackoff: 1 * time.Millisecond,
+		maxBackoff:     10 * time.Millisecond,
+	}
+	vectors, _, err := c.Embed(context.Background(), []string{"hello"}, "document")
+	if err != nil {
+		t.Fatalf("expected success after retries, got: %v", err)
+	}
+	if len(vectors) != 1 {
+		t.Errorf("expected 1 vector, got %d", len(vectors))
+	}
+	if got := attempts.Load(); got != 2 {
+		t.Errorf("expected 2 attempts, got %d", got)
 	}
 }
 
@@ -199,6 +263,7 @@ func TestRetryOn500(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClientWithBaseURL("test-key", srv.URL)
+	c.retryOverride = fastRetry()
 	_, _, err := c.Embed(context.Background(), []string{"hello"}, "document")
 	if err != nil {
 		t.Fatalf("expected success after retries, got: %v", err)
@@ -261,6 +326,7 @@ func TestContextCancellation(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClientWithBaseURL("test-key", srv.URL)
+	c.retryOverride = fastRetry()
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
@@ -357,5 +423,149 @@ func TestRerankCustomModel(t *testing.T) {
 	}
 	if usage.TotalTokens != 50 {
 		t.Errorf("expected 50 tokens, got %d", usage.TotalTokens)
+	}
+}
+
+// installCountingDialer swaps the client's transport DialContext for one that
+// increments the supplied counter on every fresh dial. The original (already
+// counter-wrapped) dialer is preserved beneath this wrapper so DialCount()
+// continues to work as well.
+func installCountingDialer(c *Client, counter *atomic.Int64, tlsCfg *tls.Config) {
+	c.transport.TLSClientConfig = tlsCfg
+	base := c.transport.DialContext
+	c.transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		counter.Add(1)
+		return base(ctx, network, addr)
+	}
+}
+
+func TestTransportReuse(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(`{}`)); err != nil {
+			t.Errorf("write: %v", err)
+		}
+	}))
+	defer srv.Close()
+
+	c := NewClientWithBaseURL("test-key", srv.URL)
+	defer c.transport.CloseIdleConnections()
+
+	var dials atomic.Int64
+	installCountingDialer(c, &dials, &tls.Config{InsecureSkipVerify: true})
+
+	for i := 0; i < 2; i++ {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL+"/", nil)
+		if err != nil {
+			t.Fatalf("new request: %v", err)
+		}
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			t.Fatalf("request %d: %v", i, err)
+		}
+		if _, err := io.ReadAll(resp.Body); err != nil {
+			t.Fatalf("drain %d: %v", i, err)
+		}
+		if err := resp.Body.Close(); err != nil {
+			t.Fatalf("close %d: %v", i, err)
+		}
+	}
+
+	if got := dials.Load(); got != 1 {
+		t.Errorf("expected 1 dial across 2 sequential requests, got %d", got)
+	}
+}
+
+func TestPreconnectIdempotent(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	c := NewClientWithBaseURL("test-key", srv.URL)
+	defer c.transport.CloseIdleConnections()
+	c.transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
+	for i := 0; i < 3; i++ {
+		if err := c.Preconnect(context.Background()); err != nil {
+			t.Fatalf("Preconnect call %d: %v", i, err)
+		}
+	}
+}
+
+func TestTimeoutHonored(t *testing.T) {
+	// Server accepts the connection but never writes a response header.
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	c := NewClientWithBaseURL("test-key", srv.URL)
+	defer c.transport.CloseIdleConnections()
+	c.transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	// Tighten ResponseHeaderTimeout so the test is fast.
+	c.transport.ResponseHeaderTimeout = 200 * time.Millisecond
+	// Disable the outer client timeout so we are sure ResponseHeaderTimeout fires.
+	c.httpClient.Timeout = 0
+
+	start := time.Now()
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL+"/", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	resp, err := c.httpClient.Do(req)
+	elapsed := time.Since(start)
+	if err == nil {
+		if cerr := resp.Body.Close(); cerr != nil {
+			t.Logf("close: %v", cerr)
+		}
+		t.Fatalf("expected timeout error, got status %d", resp.StatusCode)
+	}
+	// Lower bound: the failure must be the timeout firing, not some
+	// other immediate transport error. Without this check the test
+	// passes even if the request errors at t=0 with e.g. a TLS handshake
+	// failure — which would mask a regression where the timeout knob
+	// stops being honored. 100ms is half of ResponseHeaderTimeout (200ms),
+	// allowing for scheduling slack while still proving the timeout fired.
+	if elapsed < 100*time.Millisecond {
+		t.Errorf("error returned too quickly (%v < 100ms): timeout did not fire, err=%v",
+			elapsed, err)
+	}
+	if elapsed > c.transport.ResponseHeaderTimeout+1*time.Second {
+		t.Errorf("expected error within %v + 1s grace, got %v: %v",
+			c.transport.ResponseHeaderTimeout, elapsed, err)
+	}
+}
+
+func TestDialCountExposed(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	c := NewClientWithBaseURL("test-key", srv.URL)
+	defer c.transport.CloseIdleConnections()
+	c.transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
+	if got := c.DialCount(); got != 0 {
+		t.Fatalf("expected 0 dials before any request, got %d", got)
+	}
+
+	if err := c.Preconnect(context.Background()); err != nil {
+		t.Fatalf("Preconnect: %v", err)
+	}
+	first := c.DialCount()
+	if first < 1 {
+		t.Fatalf("expected DialCount >= 1 after first request, got %d", first)
+	}
+
+	// Force a fresh dial by closing idle connections, then issue another request.
+	c.transport.CloseIdleConnections()
+	if err := c.Preconnect(context.Background()); err != nil {
+		t.Fatalf("Preconnect 2: %v", err)
+	}
+	second := c.DialCount()
+	if second <= first {
+		t.Errorf("expected DialCount to increment after fresh dial, got first=%d second=%d", first, second)
 	}
 }

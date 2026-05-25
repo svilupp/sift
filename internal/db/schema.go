@@ -1,6 +1,6 @@
 package db
 
-const SchemaVersion = 3
+const SchemaVersion = 9
 
 const schemaSQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -30,6 +30,14 @@ CREATE TABLE IF NOT EXISTS files (
 CREATE INDEX IF NOT EXISTS idx_files_collection ON files(collection_id);
 CREATE INDEX IF NOT EXISTS idx_files_mtime ON files(mtime);
 
+CREATE TABLE IF NOT EXISTS file_collections (
+    file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+    PRIMARY KEY (file_id, collection_id)
+);
+CREATE INDEX IF NOT EXISTS idx_file_collections_collection ON file_collections(collection_id, file_id);
+CREATE INDEX IF NOT EXISTS idx_file_collections_file ON file_collections(file_id, collection_id);
+
 CREATE TABLE IF NOT EXISTS chunks (
     id INTEGER PRIMARY KEY,
     file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
@@ -38,6 +46,11 @@ CREATE TABLE IF NOT EXISTS chunks (
     end_line INTEGER NOT NULL,
     char_count INTEGER,
     created_at INTEGER,
+    section_id TEXT DEFAULT '',
+    heading TEXT DEFAULT '',
+    heading_level INTEGER DEFAULT 0,
+    chunk_hash TEXT DEFAULT '',
+    parent_chunk_id INTEGER DEFAULT NULL,
     UNIQUE(file_id, chunk_order)
 );
 CREATE INDEX IF NOT EXISTS idx_chunks_file ON chunks(file_id, chunk_order);
@@ -59,7 +72,8 @@ CREATE TABLE IF NOT EXISTS dead_letters (
     attempts INTEGER DEFAULT 1,
     first_failed_at INTEGER,
     last_failed_at INTEGER,
-    resolved_at INTEGER
+    resolved_at INTEGER,
+    kind TEXT NOT NULL DEFAULT 'embed'
 );
 
 CREATE TABLE IF NOT EXISTS api_usage (
@@ -107,4 +121,34 @@ CREATE TABLE IF NOT EXISTS search_cache (
     created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_search_cache_created ON search_cache(created_at);
+
+CREATE TABLE IF NOT EXISTS links (
+    id INTEGER PRIMARY KEY,
+    source_file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    source_section_id TEXT NOT NULL DEFAULT '',
+    source_line INTEGER NOT NULL DEFAULT 0,
+    target_path TEXT NOT NULL,
+    target_section TEXT NOT NULL DEFAULT '',
+    link_type TEXT NOT NULL DEFAULT 'markdown',
+    raw TEXT NOT NULL DEFAULT '',
+    UNIQUE(source_file_id, source_line, target_path, target_section)
+);
+CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_file_id);
+CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_path);
+
+CREATE TABLE IF NOT EXISTS backlink_counts (
+    doc_path TEXT PRIMARY KEY,
+    backlink_count INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_backlink_counts_count ON backlink_counts(backlink_count);
+
+CREATE TABLE IF NOT EXISTS read_counts (
+    doc_path TEXT PRIMARY KEY,
+    total_reads INTEGER NOT NULL DEFAULT 0,
+    unique_days INTEGER NOT NULL DEFAULT 0,
+    last_read TEXT NOT NULL DEFAULT '',
+    updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_read_counts_total ON read_counts(total_reads);
 `

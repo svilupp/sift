@@ -61,9 +61,31 @@ func ShouldIgnore(path string, collectionRoot string, patterns []string) bool {
 	for _, pattern := range patterns {
 		pattern = filepath.ToSlash(pattern)
 
+		// Trailing-slash patterns (e.g. "skip-me/") in gitignore mean
+		// "match this name as a directory only". Normalise by stripping
+		// the trailing slash for the direct/directory-style checks below.
+		// We still use the un-stripped pattern for the prefix/glob checks.
+		bare := strings.TrimSuffix(pattern, "/")
+
 		// Direct match against the relative path.
 		if matched, _ := doublestar.Match(pattern, rel); matched {
 			return true
+		}
+		if bare != pattern {
+			if matched, _ := doublestar.Match(bare, rel); matched {
+				return true
+			}
+			// Directory match at any depth (e.g. "skip-me/" should match
+			// "a/b/skip-me").
+			if !strings.Contains(bare, "/") {
+				if matched, _ := doublestar.Match("**/"+bare, rel); matched {
+					return true
+				}
+			}
+			// Files inside the ignored directory.
+			if matched, _ := doublestar.Match(bare+"/**", rel); matched {
+				return true
+			}
 		}
 
 		// Like .gitignore: if the pattern has no slash, it can match

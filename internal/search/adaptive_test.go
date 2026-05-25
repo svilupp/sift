@@ -35,12 +35,11 @@ func TestAdaptiveTopK(t *testing.T) {
 			want: 10,
 		},
 		{
-			name:   "flat scores returns near maxK",
+			name:   "flat scores returns maxK (no cliff)",
 			scores: []float64{0.45, 0.43, 0.41, 0.40, 0.39},
 			minK:   10, maxK: 20,
-			// dropRatio = 1 - 0.39/0.45 = 0.133 → slightly above 0.1 boundary
-			// k = 20 - (0.133-0.1)/(0.5-0.1) * 10 = 20 - 0.83 = 19.17 → 19
-			want: 19,
+			// No single step exceeds 5% relative drop → no cliff → maxK
+			want: 20,
 		},
 		{
 			name:   "all-zero scores returns maxK",

@@ -36,6 +36,24 @@ func FeedbackBoost(good, bad int) float64 {
 	return 0.7 + 0.6*(float64(good+1)/float64(good+bad+2))
 }
 
+// BacklinkBoost computes a logarithmic boost from backlink counts.
+// Formula: 1 + weight * log2(1 + backlinkCount)
+func BacklinkBoost(backlinkCount int, weight float64) float64 {
+	if backlinkCount <= 0 || weight <= 0 {
+		return 1.0
+	}
+	return 1.0 + weight*math.Log2(1.0+float64(backlinkCount))
+}
+
+// ReadBoost computes a dampened boost from read frequency.
+// Formula: 1 + weight * sqrt(readCount)
+func ReadBoost(readCount int, weight float64) float64 {
+	if readCount <= 0 || weight <= 0 {
+		return 1.0
+	}
+	return 1.0 + weight*math.Sqrt(float64(readCount))
+}
+
 // ComputeFinalScore combines the base score with recency and feedback boosts.
 // Formula: final = base_score * (1 + recency * recency_weight) * feedback_boost
 func ComputeFinalScore(baseScore float64, mtime time.Time, now time.Time, recencyWeight float64, halfLifeDays float64, feedbackBoost float64) float64 {
@@ -94,9 +112,9 @@ func codeVariants(word string) []string {
 	}
 
 	variants := []string{
-		word,                         // original: swapId
-		strings.Join(lower, "_"),     // swap_id
-		strings.Join(lower, " "),     // swap id
+		word,                     // original: swapId
+		strings.Join(lower, "_"), // swap_id
+		strings.Join(lower, " "), // swap id
 	}
 
 	// Deduplicate.

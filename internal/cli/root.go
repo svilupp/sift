@@ -30,8 +30,14 @@ Search examples:
 		newCollectionsCmd(),
 		newRefreshCmd(),
 		newSearchCmd(),
+		newKeywordsCmd(),
+		newRefsCmd(),
 		newFeedbackCmd(),
 		newSqlCmd(),
+		newEvalCmd(),
+		newLinksCmd(),
+		newDaemonCmd(),
+		newIndexCmd(),
 	)
 
 	return root

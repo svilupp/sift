@@ -86,6 +86,26 @@ func TestExtractTitle(t *testing.T) {
 			lines: []string{"## Early", "# Later"},
 			want:  "Early",
 		},
+		{
+			name:  "frontmatter title",
+			lines: []string{"---", "title: FM Title", "---", "# Heading"},
+			want:  "FM Title",
+		},
+		{
+			name:  "frontmatter name",
+			lines: []string{"---", "name: my-skill", "---", "# Heading"},
+			want:  "my-skill",
+		},
+		{
+			name:  "frontmatter no title falls back to heading",
+			lines: []string{"---", "tags: [a]", "---", "# Fallback"},
+			want:  "Fallback",
+		},
+		{
+			name:  "toml frontmatter title",
+			lines: []string{"+++", "title = \"TOML Title\"", "+++", "Body"},
+			want:  "TOML Title",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

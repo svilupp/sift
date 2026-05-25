@@ -1,0 +1,61 @@
+# SIFT folder index. Maintained by SIFT. Human edits preserved.
+
+schema_version = 1
+ignore = false
+
+purpose = """
+Document the sift.toml folder index system: format, lifecycle, agent usage, refresh/generation, and the sift index command.
+"""
+
+use_when = [
+  "understanding sift.toml schema and fields",
+  "learning how agents use folder indexes",
+  "running sift refresh with LLM generation",
+  "using sift index command for tree orientation",
+]
+
+[refresh]
+file_count = 5
+word_count = 2661
+
+[files."agent-usage.md"]
+ignore = false
+content_hash = "2d301cb9f576eed2"
+head_hash = "fbb0394b92db719f"
+tail_hash = "bb5abf75c4648b55"
+words = 583
+
+[files."format.md"]
+ignore = false
+content_hash = "53c4b488f69308a5"
+head_hash = "46c1aed65c72c499"
+tail_hash = "593f7458ae46193d"
+words = 612
+summary = """
+Canonical sift.toml schema: fields, per-file entries, determinism, and versioning.
+"""
+
+[files."overview.md"]
+ignore = false
+content_hash = "0045911ade59ce02"
+head_hash = "a38b845411afdb7f"
+tail_hash = "a38b845411afdb7f"
+words = 423
+summary = "High-level concept and lifecycle of folder indexes with sift.toml."
+
+[files."refresh-and-generation.md"]
+ignore = false
+content_hash = "4b6de7fb14f67d21"
+head_hash = "8b4ec287f1ae9902"
+tail_hash = "6688212e2f49a72c"
+words = 633
+summary = """
+Two-pass refresh: mechanical maintenance and opt-in LLM generation with progress and dead letters.
+"""
+
+[files."sift-index-command.md"]
+ignore = false
+content_hash = "529ec405066718b5"
+head_hash = "67f5bfbe835e7155"
+tail_hash = "67f5bfbe835e7155"
+words = 410

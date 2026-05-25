@@ -1,0 +1,25 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+
+  settings:
+    errcheck:
+      exclude-functions:
+        # io.Closer in defer — error is not actionable
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (*database/sql.DB).Close
+        - (*database/sql.Rows).Close
+        - (*sift/internal/db.DB).Close
+        - (*sift/internal/bm25.BleveIndex).Close
+        - (github.com/blevesearch/bleve/v2.Index).Close
+
+        # fmt print to stdout/stderr — write errors are not actionable
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln

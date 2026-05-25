@@ -3,18 +3,24 @@ package search
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	stdsync "sync"
 	"testing"
+	"time"
 
+	"go.uber.org/goleak"
+
+	"sift/internal/bm25"
 	"sift/internal/chunk"
 	"sift/internal/config"
 	"sift/internal/db"
-	"sift/internal/index"
 	"sift/internal/sync"
 	"sift/internal/voyage"
 )
@@ -33,9 +39,9 @@ func setupSearchEnv(t *testing.T, withEmbeddings bool) (*Engine, func()) {
 	}
 
 	blevePath := filepath.Join(t.TempDir(), "test.bleve")
-	bleveIdx, err := index.OpenBleve(blevePath, "standard")
+	bleveIdx, err := bm25.OpenBleve(blevePath, "standard")
 	if err != nil {
-		t.Fatalf("index.OpenBleve: %v", err)
+		t.Fatalf("bm25.OpenBleve: %v", err)
 	}
 
 	// Create collection with sample files.
@@ -60,7 +66,10 @@ func setupSearchEnv(t *testing.T, withEmbeddings bool) (*Engine, func()) {
 	cfg := config.Default()
 
 	// Refresh to index files (BM25 only).
-	var voyageClient *voyage.Client
+	var (
+		voyageClient *voyage.Client
+		mockSrv      *httptest.Server
+	)
 	if withEmbeddings {
 		// Create mock Voyage server for embeddings.
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +110,12 @@ func setupSearchEnv(t *testing.T, withEmbeddings bool) (*Engine, func()) {
 			}
 			w.WriteHeader(http.StatusNotFound)
 		}))
-		t.Cleanup(srv.Close)
+		// Don't t.Cleanup(srv.Close): goroutine-leak detection in tests
+		// like TestSearchContextCancel runs via `defer goleak.VerifyNone`
+		// which fires BEFORE t.Cleanup hooks. Closing the server inside
+		// the test-returned cleanup ensures httptest's Serve goroutine
+		// has exited by the time goleak inspects the runtime.
+		mockSrv = srv
 		voyageClient = voyage.NewClientWithBaseURL("test-key", srv.URL)
 	}
 
@@ -122,6 +136,11 @@ func setupSearchEnv(t *testing.T, withEmbeddings bool) (*Engine, func()) {
 	engine := NewEngine(database, bleveIdx, voyageClient, cfg)
 
 	cleanup := func() {
+		// Close the httptest server FIRST so its Serve / accept-loop
+		// goroutines have unwound before any goleak.VerifyNone runs.
+		if mockSrv != nil {
+			mockSrv.Close()
+		}
 		bleveIdx.Close()
 		database.Close()
 	}
@@ -217,6 +236,150 @@ func TestSearchCollectionFilter(t *testing.T) {
 	}
 }
 
+func setupOverlappingSearchEnv(t *testing.T) (*Engine, string, string) {
+	t.Helper()
+
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	database, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open: %v", err)
+	}
+	if err := database.Init(); err != nil {
+		t.Fatalf("db.Init: %v", err)
+	}
+
+	blevePath := filepath.Join(t.TempDir(), "test.bleve")
+	bleveIdx, err := bm25.OpenBleve(blevePath, "standard")
+	if err != nil {
+		t.Fatalf("bm25.OpenBleve: %v", err)
+	}
+
+	parentDir := t.TempDir()
+	childDir := filepath.Join(parentDir, "docs", "agent", "services")
+	if err := os.MkdirAll(childDir, 0o755); err != nil {
+		t.Fatalf("mkdir child dir: %v", err)
+	}
+
+	files := map[string]string{
+		filepath.Join(parentDir, "overview.md"):             "# Overview\n\nThe wider vault discusses onboarding and ownership.\nGateway changes are summarized at a high level.",
+		filepath.Join(childDir, "gateway.md"):               "# Gateway\n\nThe gateway service owns auth routing.\nGateway changes affect service boundaries.\nSearch should find this from the nested collection.",
+		filepath.Join(parentDir, "docs", "misc.md"):         "# Misc\n\nGeneral notes about the vault.\nNo specific gateway implementation details live here.",
+		filepath.Join(parentDir, "docs", "agent", "api.md"): "# API\n\nAgent APIs call the gateway for service discovery.\nThis file also belongs to the nested collection.",
+	}
+	for path, content := range files {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+
+	if _, err := database.AddCollection("vault", parentDir, nil); err != nil {
+		t.Fatalf("AddCollection vault: %v", err)
+	}
+	if _, err := database.AddCollection("agent", filepath.Join(parentDir, "docs", "agent"), nil); err != nil {
+		t.Fatalf("AddCollection agent: %v", err)
+	}
+
+	cfg := config.Default()
+
+	var buf strings.Builder
+	_, err = sync.Refresh(context.Background(), database, bleveIdx, nil, sync.RefreshOptions{
+		BatchSize: 128,
+		ChunkOpts: chunk.Options{
+			RowsPerChunk:  10,
+			OverlapRows:   2,
+			MinChunkChars: 5,
+			SkipEmptyRows: true,
+		},
+	}, &buf)
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+
+	engine := NewEngine(database, bleveIdx, nil, cfg)
+	t.Cleanup(func() {
+		bleveIdx.Close()
+		database.Close()
+	})
+
+	return engine, parentDir, filepath.Join(parentDir, "docs", "agent")
+}
+
+func TestSearchOverlappingCollectionFilter(t *testing.T) {
+	engine, _, childRoot := setupOverlappingSearchEnv(t)
+
+	result, err := engine.Search(context.Background(), "gateway", SearchOptions{
+		Collection: "agent",
+		TopK:       10,
+	})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(result.Results) == 0 {
+		t.Fatal("expected results for nested collection")
+	}
+
+	for _, r := range result.Results {
+		if !strings.HasPrefix(r.FilePath, childRoot) {
+			t.Fatalf("result path %s should stay inside nested collection %s", r.FilePath, childRoot)
+		}
+		if r.Collection != "agent" {
+			t.Fatalf("result collection = %q, want %q", r.Collection, "agent")
+		}
+	}
+}
+
+func TestSearchOverlappingCollectionAndPathFilter(t *testing.T) {
+	engine, _, childRoot := setupOverlappingSearchEnv(t)
+
+	result, err := engine.Search(context.Background(), "gateway", SearchOptions{
+		Collection: "agent",
+		TopK:       10,
+		PathGlob:   "*/services/*",
+	})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(result.Results) == 0 {
+		t.Fatal("expected results for nested collection + path filter")
+	}
+
+	for _, r := range result.Results {
+		if !strings.HasPrefix(r.FilePath, childRoot) {
+			t.Fatalf("result path %s should stay inside nested collection %s", r.FilePath, childRoot)
+		}
+		if !strings.Contains(r.FilePath, "/services/") {
+			t.Fatalf("result path %s should match services path filter", r.FilePath)
+		}
+	}
+}
+
+func TestSearchOverlappingCollectionsNoDuplicateResults(t *testing.T) {
+	engine, _, _ := setupOverlappingSearchEnv(t)
+
+	result, err := engine.Search(context.Background(), "gateway", SearchOptions{
+		TopK: 10,
+	})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(result.Results) == 0 {
+		t.Fatal("expected unfiltered results")
+	}
+
+	seen := make(map[string]int)
+	for _, r := range result.Results {
+		seen[r.FilePath]++
+	}
+	for path, count := range seen {
+		if count > 1 {
+			t.Fatalf("file %s appeared %d times in unfiltered results", path, count)
+		}
+	}
+}
+
 func TestSearchFallbackBM25WhenNoEmbeddings(t *testing.T) {
 	// Set up with a voyage client but no embeddings in the DB.
 	dbPath := filepath.Join(t.TempDir(), "test.db")
@@ -230,7 +393,7 @@ func TestSearchFallbackBM25WhenNoEmbeddings(t *testing.T) {
 	}
 
 	blevePath := filepath.Join(t.TempDir(), "test.bleve")
-	bleveIdx, err := index.OpenBleve(blevePath, "standard")
+	bleveIdx, err := bm25.OpenBleve(blevePath, "standard")
 	if err != nil {
 		t.Fatalf("OpenBleve: %v", err)
 	}
@@ -289,6 +452,71 @@ func TestSearchFallbackBM25WhenNoEmbeddings(t *testing.T) {
 	}
 }
 
+func TestSearchRetriesWhenAllBM25CandidatesAreStale(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	database, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open: %v", err)
+	}
+	defer database.Close()
+	if err := database.Init(); err != nil {
+		t.Fatalf("db.Init: %v", err)
+	}
+
+	blevePath := filepath.Join(t.TempDir(), "test.bleve")
+	bleveIdx, err := bm25.OpenBleve(blevePath, "standard")
+	if err != nil {
+		t.Fatalf("OpenBleve: %v", err)
+	}
+	defer bleveIdx.Close()
+
+	colDir := t.TempDir()
+	filePath := filepath.Join(colDir, "auth.md")
+	if err := os.WriteFile(filePath, []byte("Authentication tokens are validated on every request."), 0644); err != nil {
+		t.Fatalf("write auth.md: %v", err)
+	}
+
+	col, err := database.AddCollection("test", colDir, nil)
+	if err != nil {
+		t.Fatalf("AddCollection: %v", err)
+	}
+	fileID, err := database.UpsertFile(filePath, col.ID, "hash1", time.Now().Unix(), 100, "")
+	if err != nil {
+		t.Fatalf("UpsertFile: %v", err)
+	}
+	chunkID, err := database.InsertChunk(fileID, 0, 1, 1, 100)
+	if err != nil {
+		t.Fatalf("InsertChunk: %v", err)
+	}
+
+	staleChunkID := int64(99999)
+	if err := bleveIdx.Index(strconv.FormatInt(staleChunkID, 10), "authentication token fallback", filePath); err != nil {
+		t.Fatalf("index stale chunk: %v", err)
+	}
+
+	go func() {
+		time.Sleep(5 * time.Millisecond)
+		_ = bleveIdx.Delete(strconv.FormatInt(staleChunkID, 10))
+		_ = bleveIdx.Index(strconv.FormatInt(chunkID, 10), "authentication token fallback", filePath)
+	}()
+
+	engine := NewEngine(database, bleveIdx, nil, config.Default())
+	result, err := engine.Search(context.Background(), "authentication token", SearchOptions{TopK: 10})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	if len(result.Results) == 0 {
+		t.Fatal("expected retry to recover a non-stale BM25 result")
+	}
+	if result.Results[0].ChunkID != chunkID {
+		t.Fatalf("expected recovered chunk ID %d, got %d", chunkID, result.Results[0].ChunkID)
+	}
+	if result.DroppedStale == 0 {
+		t.Fatal("expected stale candidate count to be tracked")
+	}
+}
+
 func TestDedupMaxChunksPerFile(t *testing.T) {
 	// Create multiple files where one file produces many chunks.
 	// With MaxChunksPerFile=2, at most 2 results from any single file.
@@ -303,7 +531,7 @@ func TestDedupMaxChunksPerFile(t *testing.T) {
 	}
 
 	blevePath := filepath.Join(t.TempDir(), "test.bleve")
-	bleveIdx, err := index.OpenBleve(blevePath, "standard")
+	bleveIdx, err := bm25.OpenBleve(blevePath, "standard")
 	if err != nil {
 		t.Fatalf("OpenBleve: %v", err)
 	}
@@ -386,7 +614,7 @@ func TestDedupDisabledWhenZero(t *testing.T) {
 	}
 
 	blevePath := filepath.Join(t.TempDir(), "test.bleve")
-	bleveIdx, err := index.OpenBleve(blevePath, "standard")
+	bleveIdx, err := bm25.OpenBleve(blevePath, "standard")
 	if err != nil {
 		t.Fatalf("OpenBleve: %v", err)
 	}
@@ -468,7 +696,7 @@ func TestSearchEmptyQuery(t *testing.T) {
 	}
 
 	blevePath := filepath.Join(t.TempDir(), "test.bleve")
-	bleveIdx, err := index.OpenBleve(blevePath, "standard")
+	bleveIdx, err := bm25.OpenBleve(blevePath, "standard")
 	if err != nil {
 		t.Fatalf("OpenBleve: %v", err)
 	}
@@ -499,9 +727,9 @@ func setupPathFilterEnv(t *testing.T) (*Engine, string) {
 	}
 
 	blevePath := filepath.Join(t.TempDir(), "test.bleve")
-	bleveIdx, err := index.OpenBleve(blevePath, "standard")
+	bleveIdx, err := bm25.OpenBleve(blevePath, "standard")
 	if err != nil {
-		t.Fatalf("index.OpenBleve: %v", err)
+		t.Fatalf("bm25.OpenBleve: %v", err)
 	}
 
 	// Create collection with files in subdirectories mimicking vault structure.
@@ -740,13 +968,13 @@ func TestSelectForReranking(t *testing.T) {
 	}
 
 	candidates := []scoredCandidate{
-		mkCandidate(1, "/vault/docs/INFRA.md", 0.9),   // fileA chunk 1
-		mkCandidate(2, "/vault/docs/INFRA.md", 0.85),  // fileA chunk 2
-		mkCandidate(3, "/vault/repos/code.go", 0.8),   // fileB chunk 1
-		mkCandidate(4, "/vault/docs/INFRA.md", 0.75),  // fileA chunk 3
-		mkCandidate(5, "/vault/repos/code.go", 0.7),   // fileB chunk 2
-		mkCandidate(6, "/vault/docs/INFRA.md", 0.65),  // fileA chunk 4
-		mkCandidate(7, "/vault/pinned/work.md", 0.6),  // fileC chunk 1
+		mkCandidate(1, "/vault/docs/INFRA.md", 0.9),  // fileA chunk 1
+		mkCandidate(2, "/vault/docs/INFRA.md", 0.85), // fileA chunk 2
+		mkCandidate(3, "/vault/repos/code.go", 0.8),  // fileB chunk 1
+		mkCandidate(4, "/vault/docs/INFRA.md", 0.75), // fileA chunk 3
+		mkCandidate(5, "/vault/repos/code.go", 0.7),  // fileB chunk 2
+		mkCandidate(6, "/vault/docs/INFRA.md", 0.65), // fileA chunk 4
+		mkCandidate(7, "/vault/pinned/work.md", 0.6), // fileC chunk 1
 	}
 
 	t.Run("no truncation needed", func(t *testing.T) {
@@ -808,4 +1036,251 @@ func TestSelectForReranking(t *testing.T) {
 			t.Errorf("INFRA.md has %d chunks with default minPerFile, want >= 3", counts["/vault/docs/INFRA.md"])
 		}
 	})
+}
+
+// goroutineIgnores lists goroutines that are owned by libraries (bleve
+// analysis workers, http connection keep-alives) and outlive each
+// individual search test. They are not leaks introduced by the parallel
+// dispatch; we ignore them so goleak.VerifyNone focuses on our code.
+//
+// Note: we deliberately do NOT ignore "internal/poll.runtime_pollWait".
+// That symbol is the bottom of the stack for any goroutine blocked on
+// I/O — including any goroutine WE accidentally leak that's stuck on a
+// network read. Ignoring it disarms leak detection across all I/O. If a
+// specific http persistConn goroutine bottoms out at runtime_pollWait we
+// already handle that via the named writeLoop/readLoop ignores above.
+var goroutineIgnores = []goleak.Option{
+	goleak.IgnoreTopFunction("github.com/blevesearch/bleve_index_api.AnalysisWorker"),
+	goleak.IgnoreTopFunction("net/http.(*persistConn).writeLoop"),
+	goleak.IgnoreTopFunction("net/http.(*persistConn).readLoop"),
+}
+
+// waitWGTimeout waits up to timeout for wg.Done to be called for every
+// outstanding Add. It returns true if the WG drained in time, false on
+// timeout. Tests use this to deterministically synchronise with our
+// parallel-dispatch goroutines before invoking goleak.VerifyNone — a
+// time.Sleep() is racy on slow CI runners; a WG signal is precise.
+func waitWGTimeout(wg *stdsync.WaitGroup, timeout time.Duration) bool {
+	doneCh := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(doneCh)
+	}()
+	select {
+	case <-doneCh:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
+// TestSearchParallelism asserts BM25 and vector search run concurrently so
+// the wall-clock duration of the parallel phase is ~max(bm25, vec) rather
+// than their sum.
+func TestSearchParallelism(t *testing.T) {
+	defer goleak.VerifyNone(t, goroutineIgnores...)
+
+	engine, cleanup := setupSearchEnv(t, true)
+	defer cleanup()
+
+	bm25Delay := 100 * time.Millisecond
+	vecDelay := 200 * time.Millisecond
+	engine.testHooks = &searchTestHooks{
+		bm25Delay: bm25Delay,
+		vecDelay:  vecDelay,
+	}
+
+	start := time.Now()
+	result, err := engine.Search(context.Background(), "database query", SearchOptions{TopK: 10})
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	wall := time.Duration(result.WallParallelMs) * time.Millisecond
+	t.Logf("WallParallelMs=%dms, BM25=%dms, Vec=%dms, total Search elapsed=%v",
+		result.WallParallelMs, result.BM25TimeMs, result.VecTimeMs, elapsed)
+
+	// Wall parallel phase should be roughly max(bm25, vec) = 200ms,
+	// definitely well under the 300ms sum.
+	lower := vecDelay - 50*time.Millisecond
+	upper := vecDelay + 100*time.Millisecond
+	if wall < lower || wall > upper {
+		t.Errorf("WallParallelMs = %v, want between %v and %v (≈ max(bm25,vec))", wall, lower, upper)
+	}
+
+	// Sanity: WallParallelMs must equal max(BM25TimeMs, VecTimeMs).
+	expectedMax := result.BM25TimeMs
+	if result.VecTimeMs > expectedMax {
+		expectedMax = result.VecTimeMs
+	}
+	if result.WallParallelMs != expectedMax {
+		t.Errorf("WallParallelMs (%d) should equal max(BM25TimeMs=%d, VecTimeMs=%d)",
+			result.WallParallelMs, result.BM25TimeMs, result.VecTimeMs)
+	}
+
+	// Sequential dispatch would be ~bm25+vec = 300ms; the parallel phase
+	// itself must be strictly less than that.
+	sequentialFloor := bm25Delay + vecDelay
+	if wall >= sequentialFloor {
+		t.Errorf("WallParallelMs (%v) is not less than sequential bound (%v); branches did not run concurrently", wall, sequentialFloor)
+	}
+}
+
+// TestSearchBM25FailureDegradesToVector asserts that when BM25 errors but the
+// vector branch succeeds, Search returns a result built from vec-only ranking
+// rather than surfacing the BM25 error. This is the symmetric counterpart to
+// TestSearchVectorFailureDegradesToBM25 — the user constraint is "no silent
+// failures, but be pragmatic": we log the BM25 error via slog and proceed
+// with whatever ranking source is still healthy. (Previously this test
+// asserted the BM25 error was returned; that semantics changed when we made
+// the parallel-branch error handling symmetric.)
+func TestSearchBM25FailureDegradesToVector(t *testing.T) {
+	defer goleak.VerifyNone(t, goroutineIgnores...)
+
+	engine, cleanup := setupSearchEnv(t, true)
+	defer cleanup()
+
+	wantErr := errors.New("bm25 boom")
+	var wg stdsync.WaitGroup
+	engine.testHooks = &searchTestHooks{
+		bm25Err:  wantErr,
+		vecDelay: 50 * time.Millisecond, // ensure vec is in flight when bm25 returns
+		done:     &wg,
+	}
+
+	result, err := engine.Search(context.Background(), "database", SearchOptions{TopK: 10})
+	if err != nil {
+		t.Fatalf("expected vec-only fallback, got error: %v", err)
+	}
+	if result.TotalBM25 != 0 {
+		t.Errorf("TotalBM25 = %d, want 0 (BM25 errored)", result.TotalBM25)
+	}
+	// Vec branch ran, so VecTimeMs should be set even if no candidates
+	// matched the synthetic embeddings.
+	if result.VecTimeMs == 0 {
+		t.Errorf("VecTimeMs = 0, want > 0 (vec ran)")
+	}
+
+	// Wait for both dispatch goroutines to finish before goleak runs.
+	// 5s is generous compared to the ~50ms vec delay; we still fail loud
+	// if a real leak hangs them.
+	if !waitWGTimeout(&wg, 5*time.Second) {
+		t.Fatal("dispatch goroutines did not finish within 5s — possible leak")
+	}
+}
+
+// TestSearchBM25FailureNoVoyageReturnsError asserts that when BM25 errors and
+// no vector branch is configured, Search surfaces the BM25 error (no
+// fallback ranking is available).
+func TestSearchBM25FailureNoVoyageReturnsError(t *testing.T) {
+	defer goleak.VerifyNone(t, goroutineIgnores...)
+
+	engine, cleanup := setupSearchEnv(t, false)
+	defer cleanup()
+
+	wantErr := errors.New("bm25 boom")
+	engine.testHooks = &searchTestHooks{
+		bm25Err: wantErr,
+	}
+
+	_, err := engine.Search(context.Background(), "authentication", SearchOptions{TopK: 10})
+	if err == nil {
+		t.Fatal("expected BM25 error when no vec fallback, got nil")
+	}
+	if !errors.Is(err, wantErr) {
+		t.Errorf("expected BM25 error %v, got %v", wantErr, err)
+	}
+}
+
+// TestSearchVectorFailureDegradesToBM25 asserts that when the vector branch
+// errors but BM25 succeeds, Search returns BM25-only results without
+// surfacing the vec error. Counterpart to TestSearchBM25FailureDegradesToVector.
+func TestSearchVectorFailureDegradesToBM25(t *testing.T) {
+	defer goleak.VerifyNone(t, goroutineIgnores...)
+
+	engine, cleanup := setupSearchEnv(t, true)
+	defer cleanup()
+
+	engine.testHooks = &searchTestHooks{
+		vecErr:    errors.New("vec boom"),
+		bm25Delay: 10 * time.Millisecond,
+	}
+
+	result, err := engine.Search(context.Background(), "authentication JWT", SearchOptions{TopK: 10})
+	if err != nil {
+		t.Fatalf("expected BM25-only fallback, got error: %v", err)
+	}
+	if result.TotalVec != 0 {
+		t.Errorf("TotalVec = %d, want 0 (vec errored)", result.TotalVec)
+	}
+	if len(result.Results) == 0 {
+		t.Fatal("expected BM25 results despite vec error, got 0")
+	}
+	if result.TotalBM25 == 0 {
+		t.Error("TotalBM25 should be > 0 when BM25 succeeded")
+	}
+}
+
+// TestSearchNoVoyage exercises the e.Voyage == nil path: vector goroutine
+// must not be spawned and Search must complete normally.
+func TestSearchNoVoyage(t *testing.T) {
+	defer goleak.VerifyNone(t, goroutineIgnores...)
+
+	engine, cleanup := setupSearchEnv(t, false)
+	defer cleanup()
+
+	if engine.Voyage != nil {
+		t.Fatal("setup unexpectedly produced a Voyage client")
+	}
+
+	result, err := engine.Search(context.Background(), "authentication", SearchOptions{TopK: 10})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(result.Results) == 0 {
+		t.Fatal("expected BM25 results")
+	}
+	if result.TotalVec != 0 {
+		t.Errorf("TotalVec = %d, want 0 (no Voyage)", result.TotalVec)
+	}
+	if result.VecTimeMs != 0 {
+		t.Errorf("VecTimeMs = %d, want 0 (no Voyage)", result.VecTimeMs)
+	}
+	if result.WallParallelMs != result.BM25TimeMs {
+		t.Errorf("WallParallelMs = %d, want %d (BM25-only)", result.WallParallelMs, result.BM25TimeMs)
+	}
+}
+
+// TestSearchContextCancel asserts that cancelling the context mid-flight
+// lets both branches complete cleanly without leaking goroutines.
+func TestSearchContextCancel(t *testing.T) {
+	defer goleak.VerifyNone(t, goroutineIgnores...)
+
+	engine, cleanup := setupSearchEnv(t, true)
+	defer cleanup()
+
+	var wg stdsync.WaitGroup
+	engine.testHooks = &searchTestHooks{
+		bm25Delay: 50 * time.Millisecond,
+		vecDelay:  150 * time.Millisecond,
+		done:      &wg,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		cancel()
+	}()
+
+	// Search may return an error or succeed depending on which goroutine wins;
+	// both are acceptable. The contract under test is that both goroutines
+	// terminate cleanly and Search itself does not hang or panic.
+	_, _ = engine.Search(ctx, "database", SearchOptions{TopK: 10})
+
+	// Wait for both dispatch goroutines to finish before goleak runs.
+	// 5s is generous; the vec goroutine has the longest delay (150ms).
+	if !waitWGTimeout(&wg, 5*time.Second) {
+		t.Fatal("dispatch goroutines did not finish within 5s — possible leak")
+	}
 }

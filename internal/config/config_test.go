@@ -4,6 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	toml "github.com/pelletier/go-toml/v2"
 )
 
 func TestDefault(t *testing.T) {
@@ -97,12 +100,22 @@ func TestDefault(t *testing.T) {
 			{"RecencyWeight", cfg.Scoring.RecencyWeight, 0.2},
 			{"RecencyHalfLifeDays", cfg.Scoring.RecencyHalfLifeDays, 30},
 			{"FeedbackEnabled", cfg.Scoring.FeedbackEnabled, true},
+			{"BacklinkWeight", cfg.Scoring.BacklinkWeight, 0.1},
+			{"ReadSignalEnabled", cfg.Scoring.ReadSignalEnabled, true},
+			{"ReadSignalWeight", cfg.Scoring.ReadSignalWeight, 0.05},
+			{"ReadSignalPath", cfg.Scoring.ReadSignalPath, "memory/.read-signals.tsv"},
+			{"ReadSignalDays", cfg.Scoring.ReadSignalDays, 14},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				assertEqual(t, tt.got, tt.want)
 			})
 		}
+	})
+
+	t.Run("Agent", func(t *testing.T) {
+		assertEqual(t, cfg.Agent.PreviewChars, 200)
+		assertEqual(t, cfg.Agent.Hint, "")
 	})
 
 	t.Run("BM25", func(t *testing.T) {
@@ -133,6 +146,104 @@ func TestDefault(t *testing.T) {
 		assertEqual(t, cfg.API.VoyageAPIKey, "")
 		assertEqual(t, cfg.API.RequestTimeoutSecs, 60)
 	})
+
+	t.Run("Daemon", func(t *testing.T) {
+		assertEqual(t, cfg.Daemon.Enabled, true)
+		assertEqual(t, cfg.Daemon.IdleTimeout.D(), 30*time.Minute)
+		assertEqual(t, cfg.Daemon.SpawnTimeout.D(), 300*time.Millisecond)
+		assertEqual(t, cfg.Daemon.DialTimeout.D(), 50*time.Millisecond)
+		assertEqual(t, cfg.Daemon.IdleTimeoutDuration(), 30*time.Minute)
+	})
+
+	t.Run("Transport", func(t *testing.T) {
+		assertEqual(t, cfg.Transport.MaxIdleConnsPerHost, 8)
+		assertEqual(t, cfg.Transport.IdleConnTimeout.D(), 5*time.Minute)
+		assertEqual(t, cfg.Transport.TLSHandshakeTimeout.D(), 5*time.Second)
+		assertEqual(t, cfg.Transport.ResponseHeaderTimeout.D(), 30*time.Second)
+	})
+}
+
+func TestDaemonTransportRoundTrip(t *testing.T) {
+	original := Default()
+	original.Daemon.Enabled = false
+	original.Daemon.IdleTimeout = Duration(45 * time.Minute)
+	original.Daemon.SpawnTimeout = Duration(500 * time.Millisecond)
+	original.Daemon.DialTimeout = Duration(75 * time.Millisecond)
+	original.Transport.MaxIdleConnsPerHost = 16
+	original.Transport.IdleConnTimeout = Duration(2 * time.Minute)
+	original.Transport.TLSHandshakeTimeout = Duration(10 * time.Second)
+	original.Transport.ResponseHeaderTimeout = Duration(45 * time.Second)
+
+	data, err := toml.Marshal(original)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	// Durations should be encoded as strings, not integers.
+	// go-toml may use single or double quotes; accept both.
+	emitted := string(data)
+	for _, pair := range [][2]string{
+		{`idle_timeout = "45m0s"`, `idle_timeout = '45m0s'`},
+		{`spawn_timeout = "500ms"`, `spawn_timeout = '500ms'`},
+	} {
+		if !contains(emitted, pair[0]) && !contains(emitted, pair[1]) {
+			t.Errorf("expected TOML to contain %q or %q, got:\n%s", pair[0], pair[1], emitted)
+		}
+	}
+
+	var loaded Config
+	if err := toml.Unmarshal(data, &loaded); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+
+	assertEqual(t, loaded.Daemon.Enabled, false)
+	assertEqual(t, loaded.Daemon.IdleTimeout.D(), 45*time.Minute)
+	assertEqual(t, loaded.Daemon.SpawnTimeout.D(), 500*time.Millisecond)
+	assertEqual(t, loaded.Daemon.DialTimeout.D(), 75*time.Millisecond)
+	assertEqual(t, loaded.Transport.MaxIdleConnsPerHost, 16)
+	assertEqual(t, loaded.Transport.IdleConnTimeout.D(), 2*time.Minute)
+	assertEqual(t, loaded.Transport.TLSHandshakeTimeout.D(), 10*time.Second)
+	assertEqual(t, loaded.Transport.ResponseHeaderTimeout.D(), 45*time.Second)
+}
+
+// TestLoadMissingDaemonTransportSection verifies backwards-compat:
+// a config file written without the daemon/transport sections must
+// still load with the default values populated.
+func TestLoadMissingDaemonTransportSection(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	siftDir := filepath.Join(tmp, ".sift")
+	if err := os.MkdirAll(siftDir, 0755); err != nil {
+		t.Fatalf("create .sift dir: %v", err)
+	}
+
+	// Write a minimal config that lacks [daemon] and [transport].
+	cfgPath := filepath.Join(siftDir, "config.toml")
+	minimal := `
+[api]
+voyage_api_key = "k"
+[embedding]
+model = "voyage-4-lite"
+`
+	if err := os.WriteFile(cfgPath, []byte(minimal), 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	want := Default()
+	assertEqual(t, loaded.Daemon.Enabled, want.Daemon.Enabled)
+	assertEqual(t, loaded.Daemon.IdleTimeout.D(), want.Daemon.IdleTimeout.D())
+	assertEqual(t, loaded.Daemon.SpawnTimeout.D(), want.Daemon.SpawnTimeout.D())
+	assertEqual(t, loaded.Daemon.DialTimeout.D(), want.Daemon.DialTimeout.D())
+	assertEqual(t, loaded.Transport.MaxIdleConnsPerHost, want.Transport.MaxIdleConnsPerHost)
+	assertEqual(t, loaded.Transport.IdleConnTimeout.D(), want.Transport.IdleConnTimeout.D())
+	assertEqual(t, loaded.Transport.TLSHandshakeTimeout.D(), want.Transport.TLSHandshakeTimeout.D())
+	assertEqual(t, loaded.Transport.ResponseHeaderTimeout.D(), want.Transport.ResponseHeaderTimeout.D())
 }
 
 func TestSaveLoadRoundtrip(t *testing.T) {
@@ -187,10 +298,19 @@ func TestSaveLoadRoundtrip(t *testing.T) {
 	assertEqual(t, loaded.Search.RRFBoostFactor, original.Search.RRFBoostFactor)
 	assertEqual(t, loaded.Search.MaxChunksPerFile, original.Search.MaxChunksPerFile)
 
+	// Agent
+	assertEqual(t, loaded.Agent.PreviewChars, original.Agent.PreviewChars)
+	assertEqual(t, loaded.Agent.Hint, original.Agent.Hint)
+
 	// Scoring
 	assertEqual(t, loaded.Scoring.RecencyWeight, original.Scoring.RecencyWeight)
 	assertEqual(t, loaded.Scoring.RecencyHalfLifeDays, original.Scoring.RecencyHalfLifeDays)
 	assertEqual(t, loaded.Scoring.FeedbackEnabled, original.Scoring.FeedbackEnabled)
+	assertEqual(t, loaded.Scoring.BacklinkWeight, original.Scoring.BacklinkWeight)
+	assertEqual(t, loaded.Scoring.ReadSignalEnabled, original.Scoring.ReadSignalEnabled)
+	assertEqual(t, loaded.Scoring.ReadSignalWeight, original.Scoring.ReadSignalWeight)
+	assertEqual(t, loaded.Scoring.ReadSignalPath, original.Scoring.ReadSignalPath)
+	assertEqual(t, loaded.Scoring.ReadSignalDays, original.Scoring.ReadSignalDays)
 
 	// BM25
 	assertEqual(t, loaded.BM25.Analyzer, original.BM25.Analyzer)
@@ -222,7 +342,9 @@ func TestLoadMissing(t *testing.T) {
 	assertEqual(t, cfg.Chunking.RowsPerChunk, want.Chunking.RowsPerChunk)
 	assertEqual(t, cfg.Search.DefaultTopK, want.Search.DefaultTopK)
 	assertEqual(t, cfg.Search.BM25Weight, want.Search.BM25Weight)
+	assertEqual(t, cfg.Agent.PreviewChars, want.Agent.PreviewChars)
 	assertEqual(t, cfg.Scoring.RecencyWeight, want.Scoring.RecencyWeight)
+	assertEqual(t, cfg.Scoring.BacklinkWeight, want.Scoring.BacklinkWeight)
 	assertEqual(t, cfg.BM25.Analyzer, want.BM25.Analyzer)
 	assertEqual(t, cfg.Output.EditorCommand, want.Output.EditorCommand)
 	assertEqual(t, cfg.Logs.MaxWeeks, want.Logs.MaxWeeks)
@@ -232,6 +354,8 @@ func TestLoadMissing(t *testing.T) {
 func TestPathHelpers(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	// Make sure no stray override leaks in from the host env.
+	t.Setenv("SIFT_DAEMON_SOCKET", "")
 
 	tests := []struct {
 		name   string
@@ -243,6 +367,10 @@ func TestPathHelpers(t *testing.T) {
 		{"DBPath", DBPath, filepath.Join(".sift", "sift.db")},
 		{"BlevePath", BlevePath, filepath.Join(".sift", "bleve")},
 		{"LockPath", LockPath, filepath.Join(".sift", ".lock")},
+		{"LogDir", LogDir, filepath.Join(".sift", "logs")},
+		{"SocketPath", SocketPath, filepath.Join(".sift", "sift.sock")},
+		{"PIDPath", PIDPath, filepath.Join(".sift", "sift.pid")},
+		{"DaemonLogPath", DaemonLogPath, filepath.Join(".sift", "logs", "daemon.log")},
 	}
 
 	for _, tt := range tests {
@@ -256,6 +384,33 @@ func TestPathHelpers(t *testing.T) {
 			assertEqual(t, got, want)
 		})
 	}
+}
+
+func TestSocketPathEnvOverride(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	t.Run("override applied", func(t *testing.T) {
+		override := filepath.Join(tmp, "custom.sock")
+		t.Setenv("SIFT_DAEMON_SOCKET", override)
+
+		got, err := SocketPath()
+		if err != nil {
+			t.Fatalf("SocketPath: %v", err)
+		}
+		assertEqual(t, got, override)
+	})
+
+	t.Run("empty override falls back to default", func(t *testing.T) {
+		t.Setenv("SIFT_DAEMON_SOCKET", "")
+
+		got, err := SocketPath()
+		if err != nil {
+			t.Fatalf("SocketPath: %v", err)
+		}
+		want := filepath.Join(tmp, ".sift", "sift.sock")
+		assertEqual(t, got, want)
+	})
 }
 
 func TestExists(t *testing.T) {
