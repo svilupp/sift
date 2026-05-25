@@ -11,7 +11,7 @@ BINNAME  := sift
 TARGETS  := darwin-arm64 darwin-amd64
 
 # golangci-lint version
-GOLANGCI_LINT_VERSION ?= v1.62.2
+GOLANGCI_LINT_VERSION ?= v1.64.2
 
 .PHONY: build install clean test lint vet check setup fmt dist release changelog-check tag
 

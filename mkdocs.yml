@@ -38,5 +38,18 @@ nav:
   - Getting Started: getting-started.md
   - Configuration: configuration.md
   - Architecture: architecture.md
+  - Power Workflows: power-workflows.md
   - CLI Reference: cli-reference.md
+  - Folder Indexes:
+      - Overview: folder-indexes/overview.md
+      - Format reference: folder-indexes/format.md
+      - sift index command: folder-indexes/sift-index-command.md
+      - Refresh & generation: folder-indexes/refresh-and-generation.md
+      - Agent usage: folder-indexes/agent-usage.md
+  - Daemon: daemon.md
   - .siftignore: siftignore.md
+  - SPEC: SPEC.md
+
+exclude_docs: |
+  experiments/
+  plan-aigen/

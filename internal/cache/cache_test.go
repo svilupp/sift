@@ -28,7 +28,7 @@ func TestCacheRoundtrip(t *testing.T) {
 	database := setupTestDB(t)
 	c := New(database, 300, 100)
 
-	key := Key("test query", "vault", 0, "")
+	key := Key("test query", "vault", 0, "", 10, 0.4, true)
 	cr := &CachedResult{
 		Results: []search.Result{
 			{ChunkID: 1, FilePath: "/a.md", FinalScore: 0.95},
@@ -66,7 +66,7 @@ func TestCacheRoundtripEmpty(t *testing.T) {
 	database := setupTestDB(t)
 	c := New(database, 300, 100)
 
-	key := Key("empty", "", 0, "")
+	key := Key("empty", "", 0, "", 10, 0.4, true)
 	cr := &CachedResult{}
 
 	c.Put(key, cr, "empty", "")
@@ -94,7 +94,7 @@ func TestCacheExpiry(t *testing.T) {
 	database := setupTestDB(t)
 	c := New(database, 1, 100) // 1 second TTL
 
-	key := Key("test", "", 0, "")
+	key := Key("test", "", 0, "", 10, 0.4, true)
 	cr := &CachedResult{Results: []search.Result{{ChunkID: 1}}}
 	c.Put(key, cr, "test", "")
 
@@ -119,14 +119,14 @@ func TestCacheClear(t *testing.T) {
 	c := New(database, 300, 100)
 
 	for i := range 3 {
-		key := Key("query", "", int64(i*300), "")
+		key := Key("query", "", int64(i*300), "", 10, 0.4, true)
 		c.Put(key, &CachedResult{Results: []search.Result{{ChunkID: int64(i)}}}, "query", "")
 	}
 
 	c.Clear()
 
 	for i := range 3 {
-		key := Key("query", "", int64(i*300), "")
+		key := Key("query", "", int64(i*300), "", 10, 0.4, true)
 		_, ok := c.Get(key)
 		if ok {
 			t.Errorf("expected cache miss after clear for key %d", i)
@@ -139,7 +139,7 @@ func TestCacheMaxEntries(t *testing.T) {
 	c := New(database, 300, 5)
 
 	for i := range 6 {
-		key := Key("query", "", int64(i*300), "")
+		key := Key("query", "", int64(i*300), "", 10, 0.4, true)
 		c.Put(key, &CachedResult{Results: []search.Result{{ChunkID: int64(i)}}}, "query", "")
 	}
 
@@ -154,43 +154,58 @@ func TestCacheMaxEntries(t *testing.T) {
 
 func TestCacheKeyDeterminism(t *testing.T) {
 	// Same inputs → same key.
-	k1 := Key("query", "col", 1000, "")
-	k2 := Key("query", "col", 1000, "")
+	k1 := Key("query", "col", 1000, "", 10, 0.4, true)
+	k2 := Key("query", "col", 1000, "", 10, 0.4, true)
 	if k1 != k2 {
 		t.Errorf("same inputs should produce same key: %s != %s", k1, k2)
 	}
 
 	// Different query → different key.
-	k3 := Key("other", "col", 1000, "")
+	k3 := Key("other", "col", 1000, "", 10, 0.4, true)
 	if k1 == k3 {
 		t.Error("different queries should produce different keys")
 	}
 
 	// Different collection → different key.
-	k4 := Key("query", "other", 1000, "")
+	k4 := Key("query", "other", 1000, "", 10, 0.4, true)
 	if k1 == k4 {
 		t.Error("different collections should produce different keys")
 	}
 
 	// Timestamps in same 5min bucket → same key.
-	k5 := Key("query", "col", 600, "")
-	k6 := Key("query", "col", 899, "")
+	k5 := Key("query", "col", 600, "", 10, 0.4, true)
+	k6 := Key("query", "col", 899, "", 10, 0.4, true)
 	if k5 != k6 {
 		t.Errorf("timestamps in same 5min bucket should produce same key: %s != %s", k5, k6)
 	}
 
 	// Timestamps in different 5min buckets → different keys.
-	k7 := Key("query", "col", 600, "")
-	k8 := Key("query", "col", 900, "")
+	k7 := Key("query", "col", 600, "", 10, 0.4, true)
+	k8 := Key("query", "col", 900, "", 10, 0.4, true)
 	if k7 == k8 {
 		t.Error("timestamps in different 5min buckets should produce different keys")
 	}
 
 	// Zero since (no --since case).
-	k9 := Key("query", "col", 0, "")
-	k10 := Key("query", "col", 0, "")
+	k9 := Key("query", "col", 0, "", 10, 0.4, true)
+	k10 := Key("query", "col", 0, "", 10, 0.4, true)
 	if k9 != k10 {
 		t.Error("zero since should be deterministic")
+	}
+
+	k11 := Key("query", "col", 0, "", 5, 0.4, true)
+	if k9 == k11 {
+		t.Error("different top-k values should produce different keys")
+	}
+
+	k12 := Key("query", "col", 0, "", 10, 0.2, true)
+	if k9 == k12 {
+		t.Error("different thresholds should produce different keys")
+	}
+
+	k13 := Key("query", "col", 0, "", 10, 0.4, false)
+	if k9 == k13 {
+		t.Error("different adaptive modes should produce different keys")
 	}
 }
 
@@ -203,7 +218,7 @@ func TestCacheConcurrent(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			key := Key("query", "", int64(i*300), "")
+			key := Key("query", "", int64(i*300), "", 10, 0.4, true)
 			c.Put(key, &CachedResult{Results: []search.Result{{ChunkID: int64(i)}}}, "query", "")
 			c.Get(key)
 		}(i)
@@ -223,7 +238,7 @@ func TestCacheConcurrent(t *testing.T) {
 
 func TestCacheKeyNoSince(t *testing.T) {
 	// Ensure --since=0 produces a stable key.
-	k := Key("test", "vault", 0, "")
+	k := Key("test", "vault", 0, "", 10, 0.4, true)
 	if k == "" {
 		t.Error("expected non-empty key")
 	}
@@ -231,26 +246,26 @@ func TestCacheKeyNoSince(t *testing.T) {
 
 func TestCacheKeyPathGlob(t *testing.T) {
 	// Same query without path glob.
-	k1 := Key("query", "col", 0, "")
-	k2 := Key("query", "col", 0, "")
+	k1 := Key("query", "col", 0, "", 10, 0.4, true)
+	k2 := Key("query", "col", 0, "", 10, 0.4, true)
 	if k1 != k2 {
 		t.Error("same inputs (no path) should produce same key")
 	}
 
 	// Different path glob → different key.
-	k3 := Key("query", "col", 0, "*/work/*")
+	k3 := Key("query", "col", 0, "*/work/*", 10, 0.4, true)
 	if k1 == k3 {
 		t.Error("different path globs should produce different keys")
 	}
 
 	// Same path glob → same key.
-	k4 := Key("query", "col", 0, "*/work/*")
+	k4 := Key("query", "col", 0, "*/work/*", 10, 0.4, true)
 	if k3 != k4 {
 		t.Errorf("same path glob should produce same key: %s != %s", k3, k4)
 	}
 
 	// Different path globs → different keys.
-	k5 := Key("query", "col", 0, "*/personal/*")
+	k5 := Key("query", "col", 0, "*/personal/*", 10, 0.4, true)
 	if k3 == k5 {
 		t.Error("different path patterns should produce different keys")
 	}

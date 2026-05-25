@@ -113,11 +113,39 @@ boost = 0.7
 | `ttl_seconds` | int | `300` | Cache entry time-to-live (5 minutes). |
 | `max_entries` | int | `100` | Maximum cached search results. |
 
+### `[daemon]`
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | bool | `true` | Currently informational; CLI gating is via `SIFT_NO_DAEMON`. |
+| `idle_timeout` | duration | `"30m"` | Daemon exits after this much idle time (`"0"` = never exit). |
+| `spawn_timeout` | duration | `"300ms"` | Max wait for `/health` after `daemon start` / auto-spawn. |
+| `dial_timeout` | duration | `"50ms"` | Max wait when probing an existing daemon socket. |
+
+### `[transport]`
+
+`http.Transport` tuning shared by upstream API clients (currently
+Voyage). The 5 minute idle timeout is deliberately higher than stdlib's
+90 s default so the daemon's connection pool stays warm across bursty
+queries.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `max_idle_conns_per_host` | int | `8` | Idle connection pool size per host. |
+| `idle_conn_timeout` | duration | `"5m"` | How long idle connections stay open. |
+| `tls_handshake_timeout` | duration | `"5s"` | TLS handshake budget. |
+| `response_header_timeout` | duration | `"30s"` | Time to wait for upstream response headers. |
+
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `SIFT_DIR` | Override the default `~/.sift/` data directory. |
+| `SIFT_DIR` | Override the default `~/.sift/` data directory (relocates socket, PID, logs, db). |
+| `SIFT_NO_DAEMON` | Any non-empty value disables daemon dial/spawn; CLI runs in-process. |
+| `SIFT_DAEMON_SOCKET` | Override socket path (`~/.sift/sift.sock`). Test hook. |
+| `SIFT_DAEMON_SPAWNED` | Set automatically when spawning the daemon child. Not for end-user use. |
+| `VOYAGE_API_KEY` | Read by `sift config init` as the default for `api.voyage_api_key`. |
+| `DEEPINFRA_API_KEY` | Used by `sift refresh --generate=...` for LLM-generated `sift.toml` summaries. |
 
 ## Data Directory
 
@@ -125,9 +153,15 @@ All SIFT data lives in `~/.sift/` (or `$SIFT_DIR`):
 
 ```
 ~/.sift/
-  config.toml   # configuration
-  sift.db       # SQLite database (files, chunks, embeddings, feedback)
-  bleve/        # BM25 index
-  logs/         # JSONL search/feedback/sql logs
-  .lock         # file lock for concurrent access
+  config.toml          # configuration
+  sift.db              # SQLite database (files, chunks, embeddings, feedback)
+  bleve/               # BM25 index
+  logs/
+    daemon.log         # daemon's own log (slog records)
+    searches-*.jsonl   # weekly-rotated search/feedback/sql logs
+  sift.sock            # daemon Unix socket (mode 0600)
+  sift.pid             # daemon PID file (single-instance lock)
+  refresh-index.pid    # PID file for `sift refresh --detach`
+  refresh-index.log    # captured stderr for `sift refresh --detach`
+  .lock                # file lock for concurrent access
 ```

@@ -1,4 +1,4 @@
-package index
+package bm25
 
 import (
 	"os"
@@ -195,6 +195,35 @@ func TestDelete(t *testing.T) {
 	}
 	if count != 0 {
 		t.Fatalf("expected DocCount 0 after delete, got %d", count)
+	}
+}
+
+func TestApplyBatch(t *testing.T) {
+	idx := openTestIndex(t)
+
+	if err := idx.Index("old-1", "stale authentication token", "/old.md"); err != nil {
+		t.Fatalf("Index old-1: %v", err)
+	}
+
+	docs := map[string]BleveDoc{
+		"new-1": {
+			Content: "fresh authentication token",
+			Path:    "/new.md",
+		},
+	}
+	if err := idx.ApplyBatch([]string{"old-1"}, docs); err != nil {
+		t.Fatalf("ApplyBatch: %v", err)
+	}
+
+	results, err := idx.Search("authentication", 10)
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result after batch replace, got %d", len(results))
+	}
+	if results[0].ChunkID != "new-1" {
+		t.Fatalf("expected new-1 after batch replace, got %s", results[0].ChunkID)
 	}
 }
 

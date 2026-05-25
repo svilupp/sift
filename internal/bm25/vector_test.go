@@ -1,4 +1,4 @@
-package index
+package bm25
 
 import (
 	"math"

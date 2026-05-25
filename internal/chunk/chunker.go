@@ -8,11 +8,12 @@ import (
 
 // Chunk represents a section of a file.
 type Chunk struct {
-	Order     int    // Sequential index (0, 1, 2...)
-	StartLine int    // 1-based, without overlap
-	EndLine   int    // 1-based, without overlap
-	Content   string // The actual text content (with overlap for embedding)
-	CharCount int    // Character count of content without overlap
+	Order         int    // Sequential index (0, 1, 2...)
+	StartLine     int    // 1-based, without overlap
+	EndLine       int    // 1-based, without overlap
+	Content       string // The actual text content (with overlap for embedding)
+	CharCount     int    // Character count of content without overlap
+	IsFrontmatter bool   // true for the frontmatter chunk
 }
 
 // Options controls chunking behavior.
@@ -65,16 +66,40 @@ func FromLines(lines []string, opts Options) []Chunk {
 		opts.RowsPerChunk = 45
 	}
 
+	// Detect frontmatter and create a separate chunk for it.
+	var fmChunk *Chunk
+	fm := ParseFrontmatter(lines)
+	if fm != nil {
+		fmChunk = &Chunk{
+			Order:         0,
+			StartLine:     fm.StartLine,
+			EndLine:       fm.EndLine,
+			Content:       fm.Raw,
+			CharCount:     len(fm.Raw),
+			IsFrontmatter: true,
+		}
+		// Slice lines to start after the closing delimiter.
+		lines = lines[fm.EndLine:]
+	}
+
 	// Filter empty lines if configured, but keep track of original line numbers.
+	// Line numbers are offset to account for removed frontmatter lines.
+	lineOffset := 0
+	if fm != nil {
+		lineOffset = fm.EndLine
+	}
 	var numbered []numberedLine
 	for i, line := range lines {
 		if opts.SkipEmptyRows && strings.TrimSpace(line) == "" {
 			continue
 		}
-		numbered = append(numbered, numberedLine{lineNum: i + 1, text: line})
+		numbered = append(numbered, numberedLine{lineNum: i + 1 + lineOffset, text: line})
 	}
 
 	if len(numbered) == 0 {
+		if fmChunk != nil {
+			return []Chunk{*fmChunk}
+		}
 		return nil
 	}
 
@@ -138,19 +163,34 @@ func FromLines(lines []string, opts Options) []Chunk {
 		prev.endIdx = lastSkipped.endIdx
 	}
 
-	// Assign sequential Order values.
-	chunks := make([]Chunk, len(entries))
+	// Assign sequential Order values, offset by 1 when frontmatter is present.
+	orderOffset := 0
+	if fmChunk != nil {
+		orderOffset = 1
+	}
+	chunks := make([]Chunk, 0, len(entries)+orderOffset)
+	if fmChunk != nil {
+		chunks = append(chunks, *fmChunk)
+	}
 	for i, e := range entries {
-		e.chunk.Order = i
-		chunks[i] = e.chunk
+		e.chunk.Order = i + orderOffset
+		chunks = append(chunks, e.chunk)
 	}
 
 	return chunks
 }
 
-// ExtractTitle scans lines for the first H1 or H2 heading and returns the
-// text after the prefix. Returns empty string if no heading is found.
+// ExtractTitle extracts a title from file lines. It checks frontmatter first
+// (title/name keys), then falls back to scanning for H1/H2 headings in the body.
 func ExtractTitle(lines []string) string {
+	fm := ParseFrontmatter(lines)
+	if fm != nil {
+		if title := ExtractTitleFromFrontmatter(fm); title != "" {
+			return title
+		}
+		// Fall through to heading scan on body lines only.
+		lines = lines[fm.EndLine:]
+	}
 	for _, line := range lines {
 		if strings.HasPrefix(line, "# ") {
 			return strings.TrimSpace(line[2:])

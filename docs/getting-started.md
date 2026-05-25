@@ -12,7 +12,7 @@ Get a Voyage API key at [dash.voyageai.com](https://dash.voyageai.com/). SIFT wo
 === "go install"
 
     ```bash
-    go install sift/cmd/sift@latest
+    go install github.com/svilupp/sift/cmd/sift@latest
     ```
 
 === "Binary"
@@ -115,9 +115,27 @@ sift feedback abc123 --positive a,b --negative d  # a,b were good, d was bad
 
 Feedback permanently adjusts chunk rankings via Bayesian scoring. Even a single signal shifts future results.
 
+## Folder Indexes (`sift.toml`)
+
+`sift refresh` also maintains per-folder `sift.toml` files alongside your
+content. They carry mechanical hashes and counts always; opt-in LLM
+summaries describe each folder's `purpose` / `use_when` and per-file
+`summary`. Search results are decorated with this context by default
+(`--with-index`, on).
+
+```bash
+sift index                                       # read the tree (TTY=md, pipe=json)
+sift index check                                 # lint for stale/missing entries
+sift refresh --index-only --generate=missing     # AI-bootstrap empty fields
+```
+
+See [Folder Indexes](folder-indexes/overview.md) for the full design.
+
 ## Next Steps
 
 - [Configuration reference](configuration.md) — tune every aspect of the search pipeline
 - [Architecture](architecture.md) — understand how scoring, fusion, and feedback work
 - [CLI Reference](cli-reference.md) — all commands and flags
+- [Folder Indexes](folder-indexes/overview.md) — `sift.toml` and `sift index`
+- [Daemon](daemon.md) — sub-second repeated queries via warm process
 - [.siftignore](siftignore.md) — exclude files from indexing

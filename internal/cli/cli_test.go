@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,10 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"sift/internal/bm25"
 	"sift/internal/config"
 	"sift/internal/db"
-	"sift/internal/index"
 	"sift/internal/search"
+
+	_ "modernc.org/sqlite"
 )
 
 // setupTestEnv creates a temp SIFT home and collection directory with sample files.
@@ -71,6 +74,35 @@ Results include file paths, line ranges, and content previews.`,
 	}
 
 	return siftHome, collDir
+}
+
+func setupOverlappingCLIEnv(t *testing.T) (siftHome string, parentDir string, childDir string) {
+	t.Helper()
+
+	siftHome = t.TempDir()
+	t.Setenv("HOME", siftHome)
+
+	parentDir = filepath.Join(t.TempDir(), "vault")
+	childDir = filepath.Join(parentDir, "docs", "agent")
+	if err := os.MkdirAll(filepath.Join(childDir, "services"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	files := map[string]string{
+		filepath.Join(parentDir, "overview.md"):           "# Overview\n\nGateway ownership is summarized at the vault level.",
+		filepath.Join(childDir, "services", "gateway.md"): "# Gateway\n\nGateway routing lives in the nested collection and should remain searchable via the parent after child removal.",
+		filepath.Join(childDir, "api.md"):                 "# API\n\nThe nested API docs also mention gateway boundaries.",
+	}
+	for path, content := range files {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return siftHome, parentDir, childDir
 }
 
 func TestIntegrationPipeline(t *testing.T) {
@@ -180,7 +212,7 @@ func TestIntegrationPipeline(t *testing.T) {
 	// 6. Verify Bleve state
 	t.Run("VerifyBleve", func(t *testing.T) {
 		blevePath, _ := config.BlevePath()
-		bleveIdx, err := index.OpenBleve(blevePath, "standard")
+		bleveIdx, err := bm25.OpenBleve(blevePath, "standard")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -530,6 +562,134 @@ func TestIntegrationPipeline(t *testing.T) {
 	})
 }
 
+func TestOverlappingCollectionRemovalKeepsParentSearch(t *testing.T) {
+	_, parentDir, childDir := setupOverlappingCLIEnv(t)
+
+	run := func(args ...string) string {
+		t.Helper()
+		cmd := NewRootCmd("test")
+		cmd.SetArgs(args)
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		cmd.SetErr(&buf)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("%v: %v\n%s", args, err, buf.String())
+		}
+		return buf.String()
+	}
+
+	run("config", "init")
+	run("collections", "add", "vault", parentDir)
+	run("collections", "add", "agent", childDir)
+	run("refresh")
+
+	before := run("search", "gateway", "--collection", "agent")
+	if !strings.Contains(before, "gateway.md") {
+		t.Fatalf("expected nested search to find gateway.md before removal:\n%s", before)
+	}
+
+	run("collections", "remove", "agent", "--force")
+
+	after := run("search", "gateway", "--collection", "vault")
+	if !strings.Contains(after, "gateway.md") {
+		t.Fatalf("expected parent search to keep gateway.md after nested removal:\n%s", after)
+	}
+
+	dbPath, err := config.DBPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	database, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+
+	if _, err := database.GetCollection("agent"); err != nil {
+		t.Fatal(err)
+	}
+	agentCol, err := database.GetCollection("agent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if agentCol != nil {
+		t.Fatal("agent collection should be removed")
+	}
+
+	sharedFile := filepath.Join(childDir, "services", "gateway.md")
+	file, err := database.GetFileByPath(sharedFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file == nil {
+		t.Fatal("shared file should remain after child collection removal")
+	}
+
+	vault, err := database.GetCollection("vault")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vault == nil {
+		t.Fatal("vault collection should still exist")
+	}
+	if file.CollectionID != vault.ID {
+		t.Fatalf("shared file primary collection = %d, want %d", file.CollectionID, vault.ID)
+	}
+}
+
+func TestOpenDBRepairsMissingSignalTables(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	siftDir := filepath.Join(home, ".sift")
+	if err := os.MkdirAll(siftDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	dbPath := filepath.Join(siftDir, "sift.db")
+	legacyDB, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open legacy db: %v", err)
+	}
+	if err := legacyDB.Init(); err != nil {
+		t.Fatalf("Init legacy db: %v", err)
+	}
+	if err := legacyDB.Close(); err != nil {
+		t.Fatalf("Close legacy db: %v", err)
+	}
+
+	rawDB, err := sql.Open("sqlite", "file:"+dbPath)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+
+	if _, err := rawDB.Exec("DROP TABLE backlink_counts"); err != nil {
+		t.Fatalf("drop backlink_counts: %v", err)
+	}
+	if _, err := rawDB.Exec("DROP TABLE read_counts"); err != nil {
+		t.Fatalf("drop read_counts: %v", err)
+	}
+	if err := rawDB.Close(); err != nil {
+		t.Fatalf("close raw db: %v", err)
+	}
+
+	database, err := openDB()
+	if err != nil {
+		t.Fatalf("openDB: %v", err)
+	}
+	defer database.Close()
+
+	for _, table := range []string{"backlink_counts", "read_counts"} {
+		var name string
+		if err := database.QueryRow(
+			"SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+			table,
+		).Scan(&name); err != nil {
+			t.Fatalf("table %q not recreated: %v", table, err)
+		}
+	}
+}
+
 func TestPrettyHeader(t *testing.T) {
 	colorMode = 1
 	defer func() { colorMode = -1 }()
@@ -757,5 +917,257 @@ func TestRuneIndex(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("runeIndex(%q, %q) = %d, want %d", tt.haystack, tt.needle, got, tt.want)
 		}
+	}
+}
+
+// writeFileSearchFile creates a temp file with the given content, returns its path.
+func writeFileSearchFile(t *testing.T, name, content string) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestFileSearchCLI(t *testing.T) {
+	setupTestEnv(t) // sets HOME so config.Load works
+
+	// Initialize config.
+	cmd := NewRootCmd("test")
+	cmd.SetArgs([]string{"config", "init"})
+	var initBuf bytes.Buffer
+	cmd.SetOut(&initBuf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("config init: %v", err)
+	}
+
+	authFile := writeFileSearchFile(t, "auth.md", `# Authentication
+The authentication flow uses JWT tokens.
+Tokens expire after 24 hours.
+Refresh tokens last 7 days.
+OAuth2 is supported for third-party integrations.`)
+
+	t.Run("Basic", func(t *testing.T) {
+		cmd := NewRootCmd("test")
+		cmd.SetArgs([]string{"search", "authentication JWT", "--file", authFile})
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("file search: %v", err)
+		}
+		output := buf.String()
+		if !strings.Contains(output, "File search:") {
+			t.Fatalf("missing file search header: %s", output)
+		}
+		if !strings.Contains(output, "JWT") {
+			t.Fatalf("expected JWT in results: %s", output)
+		}
+	})
+
+	t.Run("Multiple", func(t *testing.T) {
+		dbFile := writeFileSearchFile(t, "db.md", `# Database
+PostgreSQL handles persistence.
+Connection pooling is important.`)
+
+		cmd := NewRootCmd("test")
+		cmd.SetArgs([]string{"search", "authentication", "--file", authFile, "--file", dbFile})
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("file search multiple: %v", err)
+		}
+		output := buf.String()
+		if !strings.Contains(output, "2 files") {
+			t.Fatalf("expected '2 files' in header: %s", output)
+		}
+	})
+
+	t.Run("JSON", func(t *testing.T) {
+		cmd := NewRootCmd("test")
+		cmd.SetArgs([]string{"search", "authentication", "--file", authFile, "--json"})
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("file search --json: %v", err)
+		}
+		var result map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+			t.Fatalf("invalid JSON: %v\noutput: %s", err, buf.String())
+		}
+		results, ok := result["results"].([]any)
+		if !ok || len(results) == 0 {
+			t.Fatal("expected results in JSON output")
+		}
+		// Check line number present.
+		first := results[0].(map[string]any)
+		if _, ok := first["line"]; !ok {
+			t.Fatal("expected 'line' field in JSON result")
+		}
+	})
+
+	t.Run("Pretty", func(t *testing.T) {
+		colorMode = 1
+		defer func() { colorMode = -1 }()
+
+		cmd := NewRootCmd("test")
+		cmd.SetArgs([]string{"search", "authentication", "--file", authFile, "--pretty"})
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("file search --pretty: %v", err)
+		}
+		output := buf.String()
+		if !strings.Contains(output, "← match") {
+			t.Fatalf("expected '← match' marker in pretty output: %s", output)
+		}
+	})
+
+	t.Run("Files", func(t *testing.T) {
+		cmd := NewRootCmd("test")
+		cmd.SetArgs([]string{"search", "authentication", "--file", authFile, "--files"})
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("file search --files: %v", err)
+		}
+		output := strings.TrimSpace(buf.String())
+		if output != authFile {
+			t.Fatalf("expected file path %s, got %s", authFile, output)
+		}
+	})
+
+	t.Run("ConflictCollection", func(t *testing.T) {
+		cmd := NewRootCmd("test")
+		cmd.SetArgs([]string{"search", "test", "--file", authFile, "--collection", "vault"})
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		cmd.SetErr(&buf)
+		err := cmd.Execute()
+		if err == nil {
+			t.Fatal("expected error for --file + --collection")
+		}
+		if !strings.Contains(err.Error(), "cannot be combined") {
+			t.Fatalf("expected 'cannot be combined' error, got: %v", err)
+		}
+	})
+
+	t.Run("MissingFile", func(t *testing.T) {
+		cmd := NewRootCmd("test")
+		cmd.SetArgs([]string{"search", "test", "--file", "/nonexistent/file.md"})
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		cmd.SetErr(&buf)
+		err := cmd.Execute()
+		if err == nil {
+			t.Fatal("expected error for missing file")
+		}
+	})
+}
+
+func TestSQLSchema(t *testing.T) {
+	setupTestEnv(t)
+
+	cmd := NewRootCmd("test")
+	cmd.SetArgs([]string{"config", "init"})
+	var initBuf bytes.Buffer
+	cmd.SetOut(&initBuf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("config init: %v", err)
+	}
+
+	cmd = NewRootCmd("test")
+	cmd.SetArgs([]string{"sql", "--schema"})
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("sql --schema: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "collections") {
+		t.Fatalf("expected collections table in schema output: %s", output)
+	}
+	if !strings.Contains(output, "path") {
+		t.Fatalf("expected column names in schema output: %s", output)
+	}
+}
+
+func TestSearchCacheRespectsQueryShape(t *testing.T) {
+	_, collDir := setupTestEnv(t)
+
+	cmd := NewRootCmd("test")
+	cmd.SetArgs([]string{"config", "init"})
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("config init: %v", err)
+	}
+
+	cmd = NewRootCmd("test")
+	cmd.SetArgs([]string{"collections", "add", "vault", collDir})
+	buf.Reset()
+	cmd.SetOut(&buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("collections add: %v", err)
+	}
+
+	cmd = NewRootCmd("test")
+	cmd.SetArgs([]string{"refresh"})
+	buf.Reset()
+	cmd.SetOut(&buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+
+	query := "authentication database search"
+
+	cmd = NewRootCmd("test")
+	cmd.SetArgs([]string{"search", query, "--top-k", "1"})
+	buf.Reset()
+	cmd.SetOut(&buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("search --top-k 1: %v", err)
+	}
+
+	type searchOutput struct {
+		Results []json.RawMessage `json:"results"`
+		Meta    struct {
+			Cached bool `json:"cached"`
+		} `json:"meta"`
+	}
+
+	runJSONSearch := func(topK string) searchOutput {
+		t.Helper()
+		cmd := NewRootCmd("test")
+		cmd.SetArgs([]string{"search", query, "--top-k", topK, "--json"})
+		var out bytes.Buffer
+		cmd.SetOut(&out)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("search --json --top-k %s: %v", topK, err)
+		}
+
+		var decoded searchOutput
+		if err := json.Unmarshal(out.Bytes(), &decoded); err != nil {
+			t.Fatalf("decode json output: %v\n%s", err, out.String())
+		}
+		return decoded
+	}
+
+	second := runJSONSearch("5")
+	if second.Meta.Cached {
+		t.Fatal("expected first --top-k 5 search to miss cache")
+	}
+	if len(second.Results) <= 1 {
+		t.Fatalf("expected --top-k 5 search to return more than one result, got %d", len(second.Results))
+	}
+
+	third := runJSONSearch("5")
+	if !third.Meta.Cached {
+		t.Fatal("expected repeated --top-k 5 search to hit cache")
+	}
+	if len(third.Results) != len(second.Results) {
+		t.Fatalf("cached result count = %d, want %d", len(third.Results), len(second.Results))
 	}
 }

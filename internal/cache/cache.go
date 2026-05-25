@@ -19,13 +19,18 @@ type Cache struct {
 
 // CachedResult mirrors search.SearchResult for cache storage.
 type CachedResult struct {
-	Results      []search.Result `json:"results"`
-	TotalBM25    int             `json:"total_bm25"`
-	TotalVec     int             `json:"total_vec"`
-	BM25TimeMs   int64           `json:"bm25_time_ms"`
-	VecTimeMs    int64           `json:"vec_time_ms"`
-	RerankTimeMs int64           `json:"rerank_time_ms"`
-	Reranked     bool            `json:"reranked"`
+	Results         []search.Result                 `json:"results"`
+	TotalBM25       int                             `json:"total_bm25"`
+	TotalVec        int                             `json:"total_vec"`
+	BM25TimeMs      int64                           `json:"bm25_time_ms"`
+	VecTimeMs       int64                           `json:"vec_time_ms"`
+	RerankTimeMs    int64                           `json:"rerank_time_ms"`
+	Reranked        bool                            `json:"reranked"`
+	TotalCandidates int                             `json:"total_candidates"`
+	FilteredCount   int                             `json:"filtered_count"`
+	DroppedStale    int                             `json:"dropped_stale"`
+	Threshold       float64                         `json:"threshold"`
+	ContentDedupMap map[int64][]search.DuplicateRef `json:"content_dedup_map,omitempty"`
 }
 
 // New creates a new cache.
@@ -37,11 +42,15 @@ func New(database *db.DB, ttlSeconds, maxEntries int) *Cache {
 	}
 }
 
-// Key computes a deterministic cache key from query parameters.
+// Key computes a deterministic cache key from query parameters and result shape.
 // Timestamps in the same 5-minute bucket produce the same key.
-func Key(query, collection string, sinceUnix int64, pathGlob string) string {
+func Key(query, collection string, sinceUnix int64, pathGlob string, topK int, threshold float64, adaptive bool, extra ...bool) string {
 	sinceQuantized := sinceUnix - (sinceUnix % 300)
-	data := fmt.Sprintf("%s\x00%s\x00%d\x00%s", query, collection, sinceQuantized, pathGlob)
+	data := fmt.Sprintf("%s\x00%s\x00%d\x00%s\x00%d\x00%.6f\x00%t",
+		query, collection, sinceQuantized, pathGlob, topK, threshold, adaptive)
+	for _, b := range extra {
+		data += fmt.Sprintf("\x00%t", b)
+	}
 	h := sha256.Sum256([]byte(data))
 	return fmt.Sprintf("%x", h)
 }

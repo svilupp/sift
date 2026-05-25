@@ -124,6 +124,52 @@ func TestFeedbackBoost(t *testing.T) {
 	}
 }
 
+func TestBacklinkBoost(t *testing.T) {
+	tests := []struct {
+		name   string
+		count  int
+		weight float64
+		want   float64
+	}{
+		{name: "zero backlinks", count: 0, weight: 0.1, want: 1.0},
+		{name: "one backlink", count: 1, weight: 0.1, want: 1.1},
+		{name: "three backlinks", count: 3, weight: 0.1, want: 1.2},
+		{name: "disabled weight", count: 7, weight: 0, want: 1.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BacklinkBoost(tt.count, tt.weight)
+			if math.Abs(got-tt.want) > 0.001 {
+				t.Errorf("BacklinkBoost(%d, %.2f) = %.6f, want %.6f", tt.count, tt.weight, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReadBoost(t *testing.T) {
+	tests := []struct {
+		name   string
+		count  int
+		weight float64
+		want   float64
+	}{
+		{name: "zero reads", count: 0, weight: 0.05, want: 1.0},
+		{name: "one read", count: 1, weight: 0.05, want: 1.05},
+		{name: "nine reads", count: 9, weight: 0.05, want: 1.15},
+		{name: "disabled weight", count: 25, weight: 0, want: 1.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ReadBoost(tt.count, tt.weight)
+			if math.Abs(got-tt.want) > 0.001 {
+				t.Errorf("ReadBoost(%d, %.2f) = %.6f, want %.6f", tt.count, tt.weight, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestComputeFinalScore(t *testing.T) {
 	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 
@@ -289,9 +335,9 @@ func TestSplitCamelCase(t *testing.T) {
 		{"swapId", []string{"swap", "Id"}},
 		{"HTMLParser", []string{"HTML", "Parser"}},
 		{"getHTTPResponse", []string{"get", "HTTP", "Response"}},
-		{"hello", nil},          // no splits
-		{"ID", nil},             // all upper, no boundary
-		{"", nil},               // empty
+		{"hello", nil}, // no splits
+		{"ID", nil},    // all upper, no boundary
+		{"", nil},      // empty
 		{"camelCaseWord", []string{"camel", "Case", "Word"}},
 	}
 
@@ -316,7 +362,7 @@ func TestExpandCodeIdentifiers(t *testing.T) {
 		want  string
 	}{
 		{"swapId", "(swapId OR swap_id OR swap id)"},
-		{"hello world", "hello world"},                          // no camelCase words
+		{"hello world", "hello world"}, // no camelCase words
 		{"swapId eleven loves", "(swapId OR swap_id OR swap id) eleven loves"},
 		{"HTMLParser", "(HTMLParser OR html_parser OR html parser)"},
 	}

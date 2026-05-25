@@ -8,14 +8,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	toml "github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 
+	"sift/internal/bm25"
 	"sift/internal/chunk"
 	"sift/internal/config"
 	"sift/internal/db"
-	"sift/internal/index"
 	siftlog "sift/internal/log"
 	"sift/internal/voyage"
 )
@@ -50,6 +51,7 @@ Examples:
 		newConfigRebuildBM25Cmd(),
 		newConfigPurgeCmd(),
 		newConfigRetryDeadLettersCmd(),
+		newConfigPurgeDeadLettersCmd(),
 	)
 
 	return cmd
@@ -134,6 +136,7 @@ func newConfigSetCmd() *cobra.Command {
 
 Valid keys:
   api.voyage_api_key          Voyage API key (enables vector search + reranking)
+  api.deepinfra_api_key       DeepInfra API key (enables AI sift.toml generation)
   embedding.model             Embedding model (default: voyage-4-lite)
   embedding.dimensions        Vector dimensions (default: 512)
   embedding.output_dtype      Output type: float, binary (default: binary)
@@ -153,9 +156,16 @@ Valid keys:
   search.rrf_boost_top_n      Boost top-N in same-rank results (default: 3)
   search.rrf_boost_factor     Boost multiplier (default: 1.5)
   search.max_chunks_per_file  Max chunks per file in results (default: 3)
+  agent.preview_chars         Agent preview length in chars (default: 200)
+  agent.hint                  Agent hint footer (default: built-in)
   scoring.recency_weight      Recency signal weight (default: 0.15)
   scoring.recency_half_life_days  Decay half-life in days (default: 30)
   scoring.feedback_enabled    Use feedback signals (default: true)
+  scoring.backlink_weight     Backlink signal weight (default: 0.1)
+  scoring.read_signal_enabled Use read-signal scoring (default: true)
+  scoring.read_signal_weight  Read-signal weight (default: 0.05)
+  scoring.read_signal_path    Read-signal TSV path (default: memory/.read-signals.tsv)
+  scoring.read_signal_days    Ignore read signals older than N days (default: 14)
   bm25.analyzer               Bleve analyzer: standard, simple, keyword (default: standard)
   output.editor_command       Editor template, e.g. "code -g {file}:{line}"
   logs.rotate_weekly          Rotate logs weekly (default: true)
@@ -258,6 +268,24 @@ func newConfigStatsCmd() *cobra.Command {
 			totalChunks, _ := database.TotalChunkCount()
 			totalEmbeddings, _ := database.TotalEmbeddingCount()
 			fmt.Fprintf(w, "\n  Total: %d files, %d chunks, %d embeddings\n", totalFiles, totalChunks, totalEmbeddings)
+			if totalChunks > 0 {
+				coverage := float64(totalEmbeddings) / float64(totalChunks) * 100
+				fmt.Fprintf(w, "  Embedding coverage: %.1f%%\n", coverage)
+			}
+
+			// File type breakdown.
+			fmt.Fprintf(w, "\nFile Types\n")
+			fmt.Fprintln(w, strings.Repeat("-", 40))
+			extCounts, extErr := database.GetFileExtensionCounts()
+			if extErr == nil && len(extCounts) > 0 {
+				for _, ec := range extCounts {
+					fmt.Fprintf(w, "  %-10s %d files\n", ec.Ext, ec.Count)
+				}
+			} else if extErr != nil {
+				fmt.Fprintf(w, "  (error: %v)\n", extErr)
+			} else {
+				fmt.Fprintln(w, "  (no files)")
+			}
 
 			// API usage section.
 			fmt.Fprintf(w, "\nAPI Usage\n")
@@ -294,6 +322,24 @@ func newConfigStatsCmd() *cobra.Command {
 					fbTotals.Total, fbTotals.Positive, fbTotals.Negative)
 			} else {
 				fmt.Fprintln(w, "  (no feedback recorded)")
+			}
+
+			// Dead letters section.
+			fmt.Fprintf(w, "\nDead Letters\n")
+			fmt.Fprintln(w, strings.Repeat("-", 40))
+			dlCount, dlErr := database.UnresolvedDeadLetterCount()
+			if dlErr == nil {
+				if dlCount > 0 {
+					fmt.Fprintf(w, "  Unresolved: %d\n", dlCount)
+					dlBreakdown, bdErr := database.GetDeadLetterBreakdown()
+					if bdErr == nil {
+						for _, dl := range dlBreakdown {
+							fmt.Fprintf(w, "    %-10s %d\n", dl.Operation, dl.Count)
+						}
+					}
+				} else {
+					fmt.Fprintln(w, "  None")
+				}
 			}
 
 			// Search sessions section.
@@ -407,7 +453,7 @@ func newConfigHealthCmd() *cobra.Command {
 				if loadErr != nil {
 					fmt.Fprintf(w, "[!!] Bleve index: cannot load config: %v\n", loadErr)
 				} else {
-					bleveIdx, openErr := index.OpenBleve(blevePath, cfg.BM25.Analyzer)
+					bleveIdx, openErr := bm25.OpenBleve(blevePath, cfg.BM25.Analyzer)
 					if openErr != nil {
 						fmt.Fprintf(w, "[!!] Bleve index: %v\n", openErr)
 					} else {
@@ -466,7 +512,30 @@ func newConfigHealthCmd() *cobra.Command {
 				}
 			}
 
-			// 6. Stale files (in DB but not on filesystem).
+			// 6. Embedding gap detection.
+			if database != nil && dbErr == nil {
+				totalChunksH, chunkErrH := database.TotalChunkCount()
+				totalEmbeddingsH, embedErrH := database.TotalEmbeddingCount()
+				if chunkErrH == nil && embedErrH == nil {
+					gap := totalChunksH - totalEmbeddingsH
+					if gap > 0 {
+						fmt.Fprintf(w, "[!!] Embedding gaps: %d chunks missing embeddings\n", gap)
+					} else {
+						fmt.Fprintf(w, "[OK] Embedding coverage: %d/%d chunks\n", totalEmbeddingsH, totalChunksH)
+					}
+				}
+			}
+
+			// 7. Dead letter age.
+			if database != nil && dbErr == nil {
+				oldestDL, oldErr := database.OldestUnresolvedDeadLetterTime()
+				if oldErr == nil && oldestDL > 0 {
+					age := time.Since(time.Unix(oldestDL, 0))
+					fmt.Fprintf(w, "[--] Oldest dead letter: %s ago\n", formatDuration(age))
+				}
+			}
+
+			// 8. Stale files (in DB but not on filesystem).
 			if database != nil && dbErr == nil {
 				paths, pathErr := database.GetAllFilePaths()
 				if pathErr != nil {
@@ -486,7 +555,7 @@ func newConfigHealthCmd() *cobra.Command {
 				}
 			}
 
-			// 7. Collections with 0 files.
+			// 9. Collections with 0 files.
 			if database != nil && dbErr == nil {
 				cols, colErr := database.ListCollections()
 				if colErr != nil {
@@ -528,6 +597,17 @@ func formatBytes(b int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
+}
+
+// formatDuration formats a duration as a human-readable string.
+func formatDuration(d time.Duration) string {
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	if d < 24*time.Hour {
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	}
+	return fmt.Sprintf("%dd", int(d.Hours()/24))
 }
 
 // --- config logs ---
@@ -643,7 +723,7 @@ or after recovering from a crash during refresh.`,
 
 			// Create new Bleve index.
 			fmt.Fprintln(w, "Creating new BM25 index...")
-			bleveIdx, err := index.OpenBleve(blevePath, cfg.BM25.Analyzer)
+			bleveIdx, err := bm25.OpenBleve(blevePath, cfg.BM25.Analyzer)
 			if err != nil {
 				return fmt.Errorf("create bleve index: %w", err)
 			}
@@ -655,36 +735,45 @@ or after recovering from a crash during refresh.`,
 				return fmt.Errorf("list collections: %w", err)
 			}
 
-			totalChunks := 0
+			collectionByID := make(map[int64]db.Collection, len(cols))
 			for _, col := range cols {
-				files, err := database.GetFilesByCollection(col.ID)
-				if err != nil {
-					return fmt.Errorf("get files for %q: %w", col.Name, err)
+				collectionByID[col.ID] = col
+			}
+
+			files, err := database.ListFiles()
+			if err != nil {
+				return fmt.Errorf("list files: %w", err)
+			}
+
+			totalChunks := 0
+			for _, f := range files {
+				col, ok := collectionByID[f.CollectionID]
+				if !ok {
+					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: primary collection %d missing for %s\n", f.CollectionID, f.Path)
+					continue
 				}
 
-				for _, f := range files {
-					chunks, err := database.GetChunksByFile(f.ID)
-					if err != nil {
-						fmt.Fprintf(cmd.ErrOrStderr(), "Warning: get chunks for %s: %v\n", f.Path, err)
+				chunks, err := database.GetChunksByFile(f.ID)
+				if err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: get chunks for %s: %v\n", f.Path, err)
+					continue
+				}
+
+				relPath := strings.TrimPrefix(f.Path, col.Path)
+				relPath = strings.TrimPrefix(relPath, "/")
+
+				for _, c := range chunks {
+					content := readChunkPreview(f.Path, c.StartLine, c.EndLine, 0)
+					if content == "" {
 						continue
 					}
-
-					relPath := strings.TrimPrefix(f.Path, col.Path)
-					relPath = strings.TrimPrefix(relPath, "/")
-
-					for _, c := range chunks {
-						content := readChunkPreview(f.Path, c.StartLine, c.EndLine, 0)
-						if content == "" {
-							continue
-						}
-						content = chunk.PrependProvenance(content, relPath, f.Title, col.Name)
-						chunkIDStr := strconv.FormatInt(c.ID, 10)
-						if err := bleveIdx.Index(chunkIDStr, content, f.Path); err != nil {
-							fmt.Fprintf(cmd.ErrOrStderr(), "Warning: index chunk %d: %v\n", c.ID, err)
-							continue
-						}
-						totalChunks++
+					content = chunk.PrependProvenance(content, relPath, f.Title, col.Name)
+					chunkIDStr := strconv.FormatInt(c.ID, 10)
+					if err := bleveIdx.Index(chunkIDStr, content, f.Path); err != nil {
+						fmt.Fprintf(cmd.ErrOrStderr(), "Warning: index chunk %d: %v\n", c.ID, err)
+						continue
 					}
+					totalChunks++
 				}
 			}
 
@@ -793,33 +882,21 @@ func purgeCollection(cmd *cobra.Command, name string, force bool) error {
 		return err
 	}
 	if _, statErr := os.Stat(blevePath); statErr == nil {
-		bleveIdx, err := index.OpenBleve(blevePath, cfg.BM25.Analyzer)
+		bleveIdx, err := bm25.OpenBleve(blevePath, cfg.BM25.Analyzer)
 		if err != nil {
 			return fmt.Errorf("open bleve: %w", err)
 		}
 		defer bleveIdx.Close()
 
-		files, err := database.GetFilesByCollection(col.ID)
-		if err != nil {
-			return fmt.Errorf("get files: %w", err)
-		}
-		for _, f := range files {
-			chunks, err := database.GetChunksByFile(f.ID)
-			if err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Warning: get chunks for %s: %v\n", f.Path, err)
-				continue
-			}
-			for _, c := range chunks {
-				if err := bleveIdx.Delete(strconv.FormatInt(c.ID, 10)); err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: bleve delete: %v\n", err)
-				}
-			}
+		if err := deleteOrphanBleveDocsForCollection(database, bleveIdx, col.ID, cmd.ErrOrStderr()); err != nil {
+			return err
 		}
 	}
 
 	if err := database.RemoveCollection(name); err != nil {
 		return err
 	}
+	_ = database.ClearCache()
 
 	fmt.Fprintf(w, "Purged collection %q\n", name)
 	return nil
@@ -828,7 +905,9 @@ func purgeCollection(cmd *cobra.Command, name string, force bool) error {
 // --- config retry-dead-letters ---
 
 func newConfigRetryDeadLettersCmd() *cobra.Command {
-	return &cobra.Command{
+	var operation string
+
+	cmd := &cobra.Command{
 		Use:   "retry-dead-letters",
 		Short: "Retry failed operations from the dead letters table",
 		Long: `Retry embed operations that failed during refresh (e.g. API timeout, rate limit).
@@ -849,6 +928,16 @@ Check "sift config health" to see if there are unresolved dead letters.`,
 			deadLetters, err := database.GetUnresolvedDeadLetters()
 			if err != nil {
 				return fmt.Errorf("get dead letters: %w", err)
+			}
+
+			if operation != "" {
+				filtered := deadLetters[:0]
+				for _, dl := range deadLetters {
+					if dl.Operation == operation {
+						filtered = append(filtered, dl)
+					}
+				}
+				deadLetters = filtered
 			}
 
 			w := cmd.OutOrStdout()
@@ -957,11 +1046,11 @@ Check "sift config health" to see if there are unresolved dead letters.`,
 					// Store embedding.
 					var vecBytes []byte
 					var dims int
-					if index.IsBinaryDtype(cfg.Embedding.OutputDtype) {
-						vecBytes = index.EncodeBinaryVector(vectors[0])
+					if bm25.IsBinaryDtype(cfg.Embedding.OutputDtype) {
+						vecBytes = bm25.EncodeBinaryVector(vectors[0])
 						dims = cfg.Embedding.Dimensions
 					} else {
-						vecBytes = index.EncodeVector(vectors[0])
+						vecBytes = bm25.EncodeVector(vectors[0])
 						dims = len(vectors[0])
 					}
 					if storeErr := database.UpsertEmbedding(chunkInfo.ChunkID, vecBytes, cfg.Embedding.Model, dims); storeErr != nil {
@@ -980,6 +1069,19 @@ Check "sift config health" to see if there are unresolved dead letters.`,
 					fmt.Fprintf(w, "       Resolved: embedded chunk %d\n\n", chunkInfo.ChunkID)
 					resolved++
 
+				case "index_summary":
+					// Folder-level AI summary failures. The resume path is
+					// to re-run `sift refresh --index-only --generate=stale`
+					// — this command marks them resolved so the next refresh
+					// re-queues them via the freshness signals.
+					if resolveErr := database.ResolveDeadLetter(dl.ID); resolveErr != nil {
+						fmt.Fprintf(cmd.ErrOrStderr(), "Warning: resolve dead letter %d: %v\n", dl.ID, resolveErr)
+						failed++
+						continue
+					}
+					fmt.Fprintf(w, "       Resolved: cleared (re-run `sift refresh --index-only --generate=stale` to regenerate)\n\n")
+					resolved++
+
 				default:
 					// Rerank and other transient failures don't need retry.
 					fmt.Fprintf(w, "       Skipped: %s failures are transient (will retry on next search)\n\n", dl.Operation)
@@ -991,6 +1093,65 @@ Check "sift config health" to see if there are unresolved dead letters.`,
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVar(&operation, "operation", "", "Filter by operation type (embed, rerank)")
+	return cmd
+}
+
+func newConfigPurgeDeadLettersCmd() *cobra.Command {
+	var (
+		olderThan string
+		operation string
+		all       bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "purge-dead-letters",
+		Short: "Resolve dead letters without retrying",
+		Long: `Mark dead letters as resolved without retrying the failed operations.
+Use this to clean up noise from transient failures.
+
+Examples:
+  sift config purge-dead-letters --all
+  sift config purge-dead-letters --older-than 7d
+  sift config purge-dead-letters --operation rerank`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			database, err := openDB()
+			if err != nil {
+				return err
+			}
+			defer database.Close()
+
+			w := cmd.OutOrStdout()
+
+			var olderThanUnix int64
+			if olderThan != "" {
+				dur, err := parseDuration(olderThan)
+				if err != nil {
+					return fmt.Errorf("invalid --older-than: %w", err)
+				}
+				olderThanUnix = time.Now().Add(-dur).Unix()
+			}
+
+			if !all && olderThan == "" && operation == "" {
+				return fmt.Errorf("specify --all, --older-than, or --operation")
+			}
+
+			count, err := database.PurgeDeadLetters(olderThanUnix, operation)
+			if err != nil {
+				return fmt.Errorf("purge: %w", err)
+			}
+
+			fmt.Fprintf(w, "Resolved %d dead letter(s)\n", count)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&olderThan, "older-than", "", "Resolve dead letters older than duration (e.g. 7d, 2w)")
+	cmd.Flags().StringVar(&operation, "operation", "", "Filter by operation type (embed, rerank)")
+	cmd.Flags().BoolVar(&all, "all", false, "Resolve all unresolved dead letters")
+
+	return cmd
 }
 
 // setConfigValue sets a config field by dot-notation key.
@@ -998,6 +1159,8 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 	switch key {
 	case "api.voyage_api_key":
 		cfg.API.VoyageAPIKey = value
+	case "api.deepinfra_api_key":
+		cfg.API.DeepInfraAPIKey = value
 	case "embedding.model":
 		cfg.Embedding.Model = value
 	case "embedding.dimensions":
@@ -1036,12 +1199,26 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 		return setFloat(&cfg.Search.RRFBoostFactor, value)
 	case "search.max_chunks_per_file":
 		return setInt(&cfg.Search.MaxChunksPerFile, value)
+	case "agent.preview_chars":
+		return setInt(&cfg.Agent.PreviewChars, value)
+	case "agent.hint":
+		cfg.Agent.Hint = value
 	case "scoring.recency_weight":
 		return setFloat(&cfg.Scoring.RecencyWeight, value)
 	case "scoring.recency_half_life_days":
 		return setInt(&cfg.Scoring.RecencyHalfLifeDays, value)
 	case "scoring.feedback_enabled":
 		return setBool(&cfg.Scoring.FeedbackEnabled, value)
+	case "scoring.backlink_weight":
+		return setFloat(&cfg.Scoring.BacklinkWeight, value)
+	case "scoring.read_signal_enabled":
+		return setBool(&cfg.Scoring.ReadSignalEnabled, value)
+	case "scoring.read_signal_weight":
+		return setFloat(&cfg.Scoring.ReadSignalWeight, value)
+	case "scoring.read_signal_path":
+		cfg.Scoring.ReadSignalPath = value
+	case "scoring.read_signal_days":
+		return setInt(&cfg.Scoring.ReadSignalDays, value)
 	case "bm25.analyzer":
 		cfg.BM25.Analyzer = value
 	case "output.editor_command":
@@ -1061,6 +1238,8 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 	switch key {
 	case "api.voyage_api_key":
 		return cfg.API.VoyageAPIKey, nil
+	case "api.deepinfra_api_key":
+		return cfg.API.DeepInfraAPIKey, nil
 	case "embedding.model":
 		return cfg.Embedding.Model, nil
 	case "embedding.dimensions":
@@ -1099,12 +1278,26 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 		return fmt.Sprint(cfg.Search.RRFBoostFactor), nil
 	case "search.max_chunks_per_file":
 		return fmt.Sprint(cfg.Search.MaxChunksPerFile), nil
+	case "agent.preview_chars":
+		return fmt.Sprint(cfg.Agent.PreviewChars), nil
+	case "agent.hint":
+		return cfg.Agent.Hint, nil
 	case "scoring.recency_weight":
 		return fmt.Sprint(cfg.Scoring.RecencyWeight), nil
 	case "scoring.recency_half_life_days":
 		return fmt.Sprint(cfg.Scoring.RecencyHalfLifeDays), nil
 	case "scoring.feedback_enabled":
 		return fmt.Sprint(cfg.Scoring.FeedbackEnabled), nil
+	case "scoring.backlink_weight":
+		return fmt.Sprint(cfg.Scoring.BacklinkWeight), nil
+	case "scoring.read_signal_enabled":
+		return fmt.Sprint(cfg.Scoring.ReadSignalEnabled), nil
+	case "scoring.read_signal_weight":
+		return fmt.Sprint(cfg.Scoring.ReadSignalWeight), nil
+	case "scoring.read_signal_path":
+		return cfg.Scoring.ReadSignalPath, nil
+	case "scoring.read_signal_days":
+		return fmt.Sprint(cfg.Scoring.ReadSignalDays), nil
 	case "bm25.analyzer":
 		return cfg.BM25.Analyzer, nil
 	case "output.editor_command":

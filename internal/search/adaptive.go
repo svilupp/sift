@@ -35,6 +35,21 @@ func AdaptiveTopK(scores []float64, minK, maxK int) int {
 		dropRatio = 0
 	}
 
+	// Check if there's a meaningful cliff (at least 5% single-step drop).
+	hasCliff := false
+	for i := range kneePos {
+		if scores[i] > 0 {
+			stepDrop := (scores[i] - scores[i+1]) / scores[i]
+			if stepDrop > 0.05 {
+				hasCliff = true
+				break
+			}
+		}
+	}
+	if !hasCliff {
+		return maxK
+	}
+
 	if dropRatio >= 0.5 {
 		return minK
 	}

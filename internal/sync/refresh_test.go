@@ -10,15 +10,15 @@ import (
 	"testing"
 	"time"
 
+	"sift/internal/bm25"
 	"sift/internal/chunk"
 	"sift/internal/db"
-	"sift/internal/index"
 )
 
 // testEnv holds shared infrastructure for refresh tests.
 type testEnv struct {
 	DB       *db.DB
-	Bleve    *index.BleveIndex
+	Bleve    *bm25.BleveIndex
 	ChunkOpt chunk.Options
 }
 
@@ -38,9 +38,9 @@ func setupEnv(t *testing.T) *testEnv {
 	}
 
 	blevePath := filepath.Join(t.TempDir(), "test.bleve")
-	b, err := index.OpenBleve(blevePath, "standard")
+	b, err := bm25.OpenBleve(blevePath, "standard")
 	if err != nil {
-		t.Fatalf("index.OpenBleve: %v", err)
+		t.Fatalf("bm25.OpenBleve: %v", err)
 	}
 	t.Cleanup(func() { b.Close() })
 
@@ -85,7 +85,7 @@ func addCollection(t *testing.T, d *db.DB, name, path string) *db.Collection {
 }
 
 // bleveDocCount returns the Bleve document count, failing the test on error.
-func bleveDocCount(t *testing.T, b *index.BleveIndex) uint64 {
+func bleveDocCount(t *testing.T, b *bm25.BleveIndex) uint64 {
 	t.Helper()
 	n, err := b.DocCount()
 	if err != nil {
@@ -422,6 +422,133 @@ func TestRefreshCollectionFilter(t *testing.T) {
 	}
 	if len(betaFiles) != 0 {
 		t.Errorf("beta DB files = %d, want 0 (beta was not refreshed)", len(betaFiles))
+	}
+}
+
+func TestRefreshOverlappingCollections(t *testing.T) {
+	env := setupEnv(t)
+	parentDir := t.TempDir()
+	childDir := filepath.Join(parentDir, "docs", "agent")
+	if err := os.MkdirAll(childDir, 0o755); err != nil {
+		t.Fatalf("mkdir child dir: %v", err)
+	}
+
+	writeMD(t, parentDir, "root.md", 20)
+	sharedPath := writeMD(t, childDir, "gateway.md", 20)
+
+	parent := addCollection(t, env.DB, "vault", parentDir)
+	child := addCollection(t, env.DB, "agent", childDir)
+
+	var buf bytes.Buffer
+	stats, err := Refresh(context.Background(), env.DB, env.Bleve, nil, RefreshOptions{
+		ChunkOpts: env.ChunkOpt,
+	}, &buf)
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+
+	if stats.FilesScanned != 2 {
+		t.Fatalf("FilesScanned = %d, want 2 unique files", stats.FilesScanned)
+	}
+	if stats.FilesNew != 2 {
+		t.Fatalf("FilesNew = %d, want 2", stats.FilesNew)
+	}
+
+	parentFiles, err := env.DB.GetFilesByCollection(parent.ID)
+	if err != nil {
+		t.Fatalf("GetFilesByCollection parent: %v", err)
+	}
+	if len(parentFiles) != 2 {
+		t.Fatalf("parent file count = %d, want 2", len(parentFiles))
+	}
+
+	childFiles, err := env.DB.GetFilesByCollection(child.ID)
+	if err != nil {
+		t.Fatalf("GetFilesByCollection child: %v", err)
+	}
+	if len(childFiles) != 1 {
+		t.Fatalf("child file count = %d, want 1", len(childFiles))
+	}
+
+	allFiles, err := env.DB.ListFiles()
+	if err != nil {
+		t.Fatalf("ListFiles: %v", err)
+	}
+	if len(allFiles) != 2 {
+		t.Fatalf("ListFiles returned %d files, want 2", len(allFiles))
+	}
+
+	shared, err := env.DB.GetFileByPath(sharedPath)
+	if err != nil {
+		t.Fatalf("GetFileByPath shared: %v", err)
+	}
+	if shared == nil {
+		t.Fatal("shared file not found")
+	}
+	if shared.CollectionID != child.ID {
+		t.Fatalf("shared primary collection = %d, want %d", shared.CollectionID, child.ID)
+	}
+
+	memberships, err := env.DB.GetFileCollectionIDs(shared.ID)
+	if err != nil {
+		t.Fatalf("GetFileCollectionIDs: %v", err)
+	}
+	if len(memberships) != 2 {
+		t.Fatalf("shared memberships = %v, want 2 collections", memberships)
+	}
+}
+
+func TestRefreshSpecificNestedCollectionMaintainsParentMembership(t *testing.T) {
+	env := setupEnv(t)
+	parentDir := t.TempDir()
+	childDir := filepath.Join(parentDir, "docs", "agent")
+	if err := os.MkdirAll(childDir, 0o755); err != nil {
+		t.Fatalf("mkdir child dir: %v", err)
+	}
+
+	sharedPath := writeMD(t, childDir, "gateway.md", 20)
+
+	parent := addCollection(t, env.DB, "vault", parentDir)
+	child := addCollection(t, env.DB, "agent", childDir)
+
+	var buf bytes.Buffer
+	stats, err := Refresh(context.Background(), env.DB, env.Bleve, nil, RefreshOptions{
+		CollectionName: "agent",
+		ChunkOpts:      env.ChunkOpt,
+	}, &buf)
+	if err != nil {
+		t.Fatalf("Refresh nested collection: %v", err)
+	}
+
+	if stats.FilesScanned != 1 {
+		t.Fatalf("FilesScanned = %d, want 1", stats.FilesScanned)
+	}
+
+	parentFiles, err := env.DB.GetFilesByCollection(parent.ID)
+	if err != nil {
+		t.Fatalf("GetFilesByCollection parent: %v", err)
+	}
+	if len(parentFiles) != 1 {
+		t.Fatalf("parent file count = %d, want 1 shared file", len(parentFiles))
+	}
+
+	childFiles, err := env.DB.GetFilesByCollection(child.ID)
+	if err != nil {
+		t.Fatalf("GetFilesByCollection child: %v", err)
+	}
+	if len(childFiles) != 1 {
+		t.Fatalf("child file count = %d, want 1 shared file", len(childFiles))
+	}
+
+	shared, err := env.DB.GetFileByPath(sharedPath)
+	if err != nil {
+		t.Fatalf("GetFileByPath shared: %v", err)
+	}
+	if shared == nil {
+		t.Fatal("shared file not found")
+	}
+	if shared.CollectionID != child.ID {
+		t.Fatalf("shared primary collection = %d, want %d", shared.CollectionID, child.ID)
 	}
 }
 

@@ -1,4 +1,4 @@
-package index
+package bm25
 
 import (
 	"errors"
@@ -81,6 +81,24 @@ func (b *BleveIndex) IndexBatch(docs map[string]BleveDoc) error {
 		return nil
 	}
 	batch := b.index.NewBatch()
+	for id, doc := range docs {
+		if err := batch.Index(id, doc); err != nil {
+			return fmt.Errorf("batch index %s: %w", id, err)
+		}
+	}
+	return b.index.Batch(batch)
+}
+
+// ApplyBatch deletes and indexes documents in a single Bleve batch.
+func (b *BleveIndex) ApplyBatch(deleteIDs []string, docs map[string]BleveDoc) error {
+	if len(deleteIDs) == 0 && len(docs) == 0 {
+		return nil
+	}
+
+	batch := b.index.NewBatch()
+	for _, id := range deleteIDs {
+		batch.Delete(id)
+	}
 	for id, doc := range docs {
 		if err := batch.Index(id, doc); err != nil {
 			return fmt.Errorf("batch index %s: %w", id, err)

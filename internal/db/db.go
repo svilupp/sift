@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -52,25 +54,49 @@ type FileRecord struct {
 
 // ChunkRecord represents a stored chunk.
 type ChunkRecord struct {
-	ID        int64
-	FileID    int64
-	Order     int
-	StartLine int
-	EndLine   int
-	CharCount int
-	CreatedAt int64
+	ID            int64
+	FileID        int64
+	Order         int
+	StartLine     int
+	EndLine       int
+	CharCount     int
+	CreatedAt     int64
+	SectionID     string // anchor slug e.g. "trust-zones"
+	Heading       string // raw heading text e.g. "Trust Zones"
+	HeadingLevel  int    // 1-6 for H1-H6, 0 for preamble
+	ChunkHash     string // xxhash64 of chunk content
+	ParentChunkID *int64 // FK to parent section chunk (nullable)
+}
+
+// LinkRecord represents a stored link between files/sections.
+type LinkRecord struct {
+	ID              int64
+	SourceFileID    int64
+	SourceSectionID string
+	SourceLine      int
+	TargetPath      string
+	TargetSection   string
+	LinkType        string
+	Raw             string
 }
 
 // Open opens or creates the SQLite database at the given path.
 func Open(path string) (*DB, error) {
-	sqlDB, err := sql.Open("sqlite", "file:"+path+"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)")
+	sqlDB, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout%3d5000&_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)")
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
 
-	if err := sqlDB.Ping(); err != nil {
-		sqlDB.Close()
-		return nil, fmt.Errorf("ping db: %w", err)
+	for attempt := 0; attempt < 10; attempt++ {
+		if err := sqlDB.Ping(); err != nil {
+			if attempt < 9 && strings.Contains(err.Error(), "SQLITE_BUSY") {
+				time.Sleep(25 * time.Millisecond)
+				continue
+			}
+			sqlDB.Close()
+			return nil, fmt.Errorf("ping db: %w", err)
+		}
+		break
 	}
 
 	return &DB{conn: sqlDB}, nil
@@ -113,8 +139,42 @@ func (db *DB) Init() error {
 	// The CREATE TABLE in schemaSQL handles this, but ensure the index exists for older DBs.
 	db.conn.Exec(`CREATE INDEX IF NOT EXISTS idx_search_cache_created ON search_cache(created_at)`) //nolint:errcheck // idempotent
 
-	_, err := db.conn.Exec(
-		"INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (?, ?)",
+	// Migration v3 -> v5: section-aware chunks
+	db.conn.Exec("ALTER TABLE chunks ADD COLUMN section_id TEXT DEFAULT ''")           //nolint:errcheck // idempotent
+	db.conn.Exec("ALTER TABLE chunks ADD COLUMN heading TEXT DEFAULT ''")              //nolint:errcheck // idempotent
+	db.conn.Exec("ALTER TABLE chunks ADD COLUMN heading_level INTEGER DEFAULT 0")      //nolint:errcheck // idempotent
+	db.conn.Exec("ALTER TABLE chunks ADD COLUMN chunk_hash TEXT DEFAULT ''")           //nolint:errcheck // idempotent
+	db.conn.Exec("ALTER TABLE chunks ADD COLUMN parent_chunk_id INTEGER DEFAULT NULL") //nolint:errcheck // idempotent
+
+	// Migration v8 -> v9: add kind discriminator to dead_letters so the
+	// table can host both `embed` and `index_summary` failures.
+	db.conn.Exec("ALTER TABLE dead_letters ADD COLUMN kind TEXT NOT NULL DEFAULT 'embed'")              //nolint:errcheck // idempotent
+	db.conn.Exec("CREATE INDEX IF NOT EXISTS idx_dead_letters_kind ON dead_letters(kind, resolved_at)") //nolint:errcheck // idempotent
+	_, _ = db.conn.Exec(`CREATE TABLE IF NOT EXISTS file_collections (
+		file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+		collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+		PRIMARY KEY (file_id, collection_id)
+	)`)
+	db.conn.Exec("CREATE INDEX IF NOT EXISTS idx_file_collections_collection ON file_collections(collection_id, file_id)") //nolint:errcheck // idempotent
+	db.conn.Exec("CREATE INDEX IF NOT EXISTS idx_file_collections_file ON file_collections(file_id, collection_id)")       //nolint:errcheck // idempotent
+	_, _ = db.conn.Exec(`
+		INSERT OR IGNORE INTO file_collections (file_id, collection_id)
+		SELECT id, collection_id
+		FROM files
+		WHERE collection_id IS NOT NULL
+	`)
+
+	var version int
+	err := db.conn.QueryRow("SELECT version FROM schema_version WHERE version = ? LIMIT 1", SchemaVersion).Scan(&version)
+	switch {
+	case err == nil:
+		return nil
+	case !errors.Is(err, sql.ErrNoRows):
+		return fmt.Errorf("check schema version: %w", err)
+	}
+
+	_, err = db.conn.Exec(
+		"INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
 		SchemaVersion, time.Now().Unix(),
 	)
 	if err != nil {
@@ -241,7 +301,7 @@ func (db *DB) GetCollectionByID(id int64) (*Collection, error) {
 	return &c, nil
 }
 
-// RemoveCollection deletes a collection and its associated files/chunks/embeddings.
+// RemoveCollection deletes a collection membership and any files orphaned by that removal.
 func (db *DB) RemoveCollection(name string) error {
 	tx, err := db.conn.Begin()
 	if err != nil {
@@ -258,8 +318,46 @@ func (db *DB) RemoveCollection(name string) error {
 		return fmt.Errorf("find collection: %w", err)
 	}
 
-	if _, err := tx.Exec("DELETE FROM files WHERE collection_id = ?", id); err != nil {
-		return fmt.Errorf("delete files: %w", err)
+	rows, err := tx.Query("SELECT DISTINCT file_id FROM file_collections WHERE collection_id = ? ORDER BY file_id", id)
+	if err != nil {
+		return fmt.Errorf("list affected files: %w", err)
+	}
+	var affectedFileIDs []int64
+	for rows.Next() {
+		var fileID int64
+		if scanErr := rows.Scan(&fileID); scanErr != nil {
+			rows.Close()
+			return fmt.Errorf("scan affected file id: %w", scanErr)
+		}
+		affectedFileIDs = append(affectedFileIDs, fileID)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("iterate affected files: %w", err)
+	}
+	rows.Close()
+
+	if _, err := tx.Exec("DELETE FROM file_collections WHERE collection_id = ?", id); err != nil {
+		return fmt.Errorf("delete file memberships: %w", err)
+	}
+
+	var orphanFileIDs []int64
+	for _, fileID := range affectedFileIDs {
+		primaryID, selErr := selectPrimaryCollectionID(tx, fileID)
+		switch {
+		case errors.Is(selErr, sql.ErrNoRows):
+			orphanFileIDs = append(orphanFileIDs, fileID)
+		case selErr != nil:
+			return fmt.Errorf("select new primary for file %d: %w", fileID, selErr)
+		default:
+			if _, err := tx.Exec("UPDATE files SET collection_id = ? WHERE id = ?", primaryID, fileID); err != nil {
+				return fmt.Errorf("update primary collection for file %d: %w", fileID, err)
+			}
+		}
+	}
+
+	if err := deleteFilesByID(tx, orphanFileIDs); err != nil {
+		return fmt.Errorf("delete orphan files: %w", err)
 	}
 
 	if _, err := tx.Exec("DELETE FROM collections WHERE id = ?", id); err != nil {
@@ -267,6 +365,40 @@ func (db *DB) RemoveCollection(name string) error {
 	}
 
 	return tx.Commit()
+}
+
+func selectPrimaryCollectionID(ex execer, fileID int64) (int64, error) {
+	var collectionID int64
+	err := ex.QueryRow(`
+		SELECT fc.collection_id
+		FROM file_collections fc
+		JOIN collections c ON c.id = fc.collection_id
+		WHERE fc.file_id = ?
+		ORDER BY LENGTH(c.path) DESC, c.name ASC, c.id ASC
+		LIMIT 1
+	`, fileID).Scan(&collectionID)
+	if err != nil {
+		return 0, err
+	}
+	return collectionID, nil
+}
+
+func deleteFilesByID(ex execer, fileIDs []int64) error {
+	if len(fileIDs) == 0 {
+		return nil
+	}
+
+	placeholders := make([]string, len(fileIDs))
+	args := make([]any, len(fileIDs))
+	for i, fileID := range fileIDs {
+		placeholders[i] = "?"
+		args[i] = fileID
+	}
+
+	if _, err := ex.Exec("DELETE FROM files WHERE id IN ("+strings.Join(placeholders, ",")+")", args...); err != nil {
+		return fmt.Errorf("delete files by id: %w", err)
+	}
+	return nil
 }
 
 // UpsertFile inserts or updates a file record, returning the file ID.
@@ -285,6 +417,7 @@ func upsertFile(ex execer, path string, collectionID int64, hash string, mtime, 
 		INSERT INTO files (path, collection_id, file_hash, mtime, size_bytes, last_indexed, chunk_count, title)
 		VALUES (?, ?, ?, ?, ?, ?, 0, ?)
 		ON CONFLICT(path) DO UPDATE SET
+			collection_id = excluded.collection_id,
 			file_hash = excluded.file_hash,
 			mtime = excluded.mtime,
 			size_bytes = excluded.size_bytes,
@@ -302,7 +435,23 @@ func upsertFile(ex execer, path string, collectionID int64, hash string, mtime, 
 	if err != nil {
 		return 0, fmt.Errorf("get file id: %w", err)
 	}
+	if err := ensureFileCollection(ex, id, collectionID); err != nil {
+		return 0, err
+	}
 	return id, nil
+}
+
+func ensureFileCollection(ex execer, fileID, collectionID int64) error {
+	if collectionID <= 0 {
+		return nil
+	}
+	if _, err := ex.Exec(
+		"INSERT OR IGNORE INTO file_collections (file_id, collection_id) VALUES (?, ?)",
+		fileID, collectionID,
+	); err != nil {
+		return fmt.Errorf("ensure file collection: %w", err)
+	}
+	return nil
 }
 
 // DeleteChunksByFile removes all chunks for a file.
@@ -363,6 +512,23 @@ func updateFileChunkCount(ex execer, fileID int64, count int) error {
 	return nil
 }
 
+// UpdateFilePrimaryCollection updates the canonical collection for a file.
+func (db *DB) UpdateFilePrimaryCollection(fileID int64, collectionID int64) error {
+	return updateFilePrimaryCollection(db.conn, fileID, collectionID)
+}
+
+// UpdateFilePrimaryCollection updates the canonical collection for a file within a transaction.
+func (t *Tx) UpdateFilePrimaryCollection(fileID int64, collectionID int64) error {
+	return updateFilePrimaryCollection(t.tx, fileID, collectionID)
+}
+
+func updateFilePrimaryCollection(ex execer, fileID int64, collectionID int64) error {
+	if _, err := ex.Exec("UPDATE files SET collection_id = ? WHERE id = ?", collectionID, fileID); err != nil {
+		return fmt.Errorf("update file primary collection: %w", err)
+	}
+	return nil
+}
+
 // GetFileByPath returns a file record by path.
 func (db *DB) GetFileByPath(path string) (*FileRecord, error) {
 	var f FileRecord
@@ -386,7 +552,11 @@ func (db *DB) GetFileByPath(path string) (*FileRecord, error) {
 // GetFilesByCollection returns all file records for a collection.
 func (db *DB) GetFilesByCollection(collectionID int64) ([]FileRecord, error) {
 	rows, err := db.conn.Query(
-		"SELECT id, path, collection_id, file_hash, mtime, size_bytes, last_indexed, chunk_count, COALESCE(title,'') FROM files WHERE collection_id = ?",
+		`SELECT f.id, f.path, f.collection_id, f.file_hash, f.mtime, f.size_bytes, f.last_indexed, f.chunk_count, COALESCE(f.title,'')
+		 FROM files f
+		 JOIN file_collections fc ON fc.file_id = f.id
+		 WHERE fc.collection_id = ?
+		 ORDER BY f.path`,
 		collectionID,
 	)
 	if err != nil {
@@ -409,6 +579,109 @@ func (db *DB) GetFilesByCollection(collectionID int64) ([]FileRecord, error) {
 	return files, rows.Err()
 }
 
+// ListFiles returns all unique file records ordered by path.
+func (db *DB) ListFiles() ([]FileRecord, error) {
+	rows, err := db.conn.Query(
+		"SELECT id, path, collection_id, file_hash, mtime, size_bytes, last_indexed, chunk_count, COALESCE(title,'') FROM files ORDER BY path",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query files: %w", err)
+	}
+	defer rows.Close()
+
+	var files []FileRecord
+	for rows.Next() {
+		var f FileRecord
+		var hash sql.NullString
+		if err := rows.Scan(&f.ID, &f.Path, &f.CollectionID, &hash, &f.Mtime, &f.SizeBytes, &f.LastIndexed, &f.ChunkCount, &f.Title); err != nil {
+			return nil, fmt.Errorf("scan file: %w", err)
+		}
+		if hash.Valid {
+			f.FileHash = hash.String
+		}
+		files = append(files, f)
+	}
+	return files, rows.Err()
+}
+
+// GetFileCollectionIDs returns all collection memberships for a file.
+func (db *DB) GetFileCollectionIDs(fileID int64) ([]int64, error) {
+	rows, err := db.conn.Query(
+		"SELECT collection_id FROM file_collections WHERE file_id = ? ORDER BY collection_id",
+		fileID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query file collection ids: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan file collection id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// FileBelongsToCollection reports whether a file has the given collection membership.
+func (db *DB) FileBelongsToCollection(fileID, collectionID int64) (bool, error) {
+	var exists int
+	err := db.conn.QueryRow(
+		"SELECT EXISTS(SELECT 1 FROM file_collections WHERE file_id = ? AND collection_id = ?)",
+		fileID, collectionID,
+	).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check file collection membership: %w", err)
+	}
+	return exists != 0, nil
+}
+
+// ReplaceFileCollections replaces all collection memberships for a file.
+func (db *DB) ReplaceFileCollections(fileID int64, collectionIDs []int64) error {
+	return replaceFileCollections(db.conn, fileID, collectionIDs)
+}
+
+// ReplaceFileCollections replaces all collection memberships for a file within a transaction.
+func (t *Tx) ReplaceFileCollections(fileID int64, collectionIDs []int64) error {
+	return replaceFileCollections(t.tx, fileID, collectionIDs)
+}
+
+func replaceFileCollections(ex execer, fileID int64, collectionIDs []int64) error {
+	if _, err := ex.Exec("DELETE FROM file_collections WHERE file_id = ?", fileID); err != nil {
+		return fmt.Errorf("clear file collections: %w", err)
+	}
+	if len(collectionIDs) == 0 {
+		return nil
+	}
+
+	unique := make(map[int64]struct{}, len(collectionIDs))
+	ids := make([]int64, 0, len(collectionIDs))
+	for _, id := range collectionIDs {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := unique[id]; ok {
+			continue
+		}
+		unique[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+
+	for _, id := range ids {
+		if _, err := ex.Exec(
+			"INSERT INTO file_collections (file_id, collection_id) VALUES (?, ?)",
+			fileID, id,
+		); err != nil {
+			return fmt.Errorf("insert file collection %d: %w", id, err)
+		}
+	}
+	return nil
+}
+
 // DeleteFile removes a file and its chunks/embeddings (via CASCADE).
 func (db *DB) DeleteFile(fileID int64) error {
 	_, err := db.conn.Exec("DELETE FROM files WHERE id = ?", fileID)
@@ -421,7 +694,10 @@ func (db *DB) DeleteFile(fileID int64) error {
 // GetChunksByFile returns all chunks for a file, ordered by chunk_order.
 func (db *DB) GetChunksByFile(fileID int64) ([]ChunkRecord, error) {
 	rows, err := db.conn.Query(
-		"SELECT id, file_id, chunk_order, start_line, end_line, char_count, created_at FROM chunks WHERE file_id = ? ORDER BY chunk_order",
+		`SELECT id, file_id, chunk_order, start_line, end_line, char_count, created_at,
+		        COALESCE(section_id,''), COALESCE(heading,''), COALESCE(heading_level,0),
+		        COALESCE(chunk_hash,''), parent_chunk_id
+		 FROM chunks WHERE file_id = ? ORDER BY chunk_order`,
 		fileID,
 	)
 	if err != nil {
@@ -432,8 +708,14 @@ func (db *DB) GetChunksByFile(fileID int64) ([]ChunkRecord, error) {
 	var chunks []ChunkRecord
 	for rows.Next() {
 		var c ChunkRecord
-		if err := rows.Scan(&c.ID, &c.FileID, &c.Order, &c.StartLine, &c.EndLine, &c.CharCount, &c.CreatedAt); err != nil {
+		var parentID sql.NullInt64
+		if err := rows.Scan(&c.ID, &c.FileID, &c.Order, &c.StartLine, &c.EndLine, &c.CharCount, &c.CreatedAt,
+			&c.SectionID, &c.Heading, &c.HeadingLevel, &c.ChunkHash, &parentID); err != nil {
 			return nil, fmt.Errorf("scan chunk: %w", err)
+		}
+		if parentID.Valid {
+			v := parentID.Int64
+			c.ParentChunkID = &v
 		}
 		chunks = append(chunks, c)
 	}
@@ -443,7 +725,7 @@ func (db *DB) GetChunksByFile(fileID int64) ([]ChunkRecord, error) {
 // CollectionFileCount returns the number of files in a collection.
 func (db *DB) CollectionFileCount(collectionID int64) (int, error) {
 	var count int
-	err := db.conn.QueryRow("SELECT COUNT(*) FROM files WHERE collection_id = ?", collectionID).Scan(&count)
+	err := db.conn.QueryRow("SELECT COUNT(*) FROM file_collections WHERE collection_id = ?", collectionID).Scan(&count)
 	return count, err
 }
 
@@ -451,7 +733,10 @@ func (db *DB) CollectionFileCount(collectionID int64) (int, error) {
 func (db *DB) CollectionChunkCount(collectionID int64) (int, error) {
 	var count int
 	err := db.conn.QueryRow(
-		"SELECT COALESCE(SUM(chunk_count), 0) FROM files WHERE collection_id = ?",
+		`SELECT COALESCE(SUM(f.chunk_count), 0)
+		 FROM files f
+		 JOIN file_collections fc ON fc.file_id = f.id
+		 WHERE fc.collection_id = ?`,
 		collectionID,
 	).Scan(&count)
 	return count, err
@@ -461,15 +746,24 @@ func (db *DB) CollectionChunkCount(collectionID int64) (int, error) {
 // Returns nil, nil, nil if the chunk does not exist.
 func (db *DB) GetChunkWithFile(chunkID int64) (*ChunkRecord, *FileRecord, error) {
 	var c ChunkRecord
+	var parentID sql.NullInt64
 	err := db.conn.QueryRow(
-		"SELECT id, file_id, chunk_order, start_line, end_line, char_count, created_at FROM chunks WHERE id = ?",
+		`SELECT id, file_id, chunk_order, start_line, end_line, char_count, created_at,
+		        COALESCE(section_id,''), COALESCE(heading,''), COALESCE(heading_level,0),
+		        COALESCE(chunk_hash,''), parent_chunk_id
+		 FROM chunks WHERE id = ?`,
 		chunkID,
-	).Scan(&c.ID, &c.FileID, &c.Order, &c.StartLine, &c.EndLine, &c.CharCount, &c.CreatedAt)
+	).Scan(&c.ID, &c.FileID, &c.Order, &c.StartLine, &c.EndLine, &c.CharCount, &c.CreatedAt,
+		&c.SectionID, &c.Heading, &c.HeadingLevel, &c.ChunkHash, &parentID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil, nil
 		}
 		return nil, nil, fmt.Errorf("get chunk: %w", err)
+	}
+	if parentID.Valid {
+		v := parentID.Int64
+		c.ParentChunkID = &v
 	}
 
 	var f FileRecord
@@ -527,6 +821,39 @@ func (db *DB) UpsertEmbedding(chunkID int64, vector []byte, model string, dims i
 	return nil
 }
 
+// ChunkWithFile holds a chunk ID and its file path/line info for retry.
+type ChunkWithFile struct {
+	ChunkID   int64
+	FilePath  string
+	StartLine int
+	EndLine   int
+}
+
+// QueryChunksWithoutEmbeddings returns chunks that have no corresponding embedding.
+func (db *DB) QueryChunksWithoutEmbeddings() ([]ChunkWithFile, error) {
+	rows, err := db.conn.Query(`
+		SELECT c.id, f.path, c.start_line, c.end_line
+		FROM chunks c
+		JOIN files f ON f.id = c.file_id
+		WHERE NOT EXISTS (SELECT 1 FROM embeddings e WHERE e.chunk_id = c.id)
+		ORDER BY c.id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("query unembedded chunks: %w", err)
+	}
+	defer rows.Close()
+
+	var result []ChunkWithFile
+	for rows.Next() {
+		var cw ChunkWithFile
+		if err := rows.Scan(&cw.ChunkID, &cw.FilePath, &cw.StartLine, &cw.EndLine); err != nil {
+			return nil, fmt.Errorf("scan unembedded chunk: %w", err)
+		}
+		result = append(result, cw)
+	}
+	return result, rows.Err()
+}
+
 // GetEmbedding returns the embedding vector for a chunk.
 func (db *DB) GetEmbedding(chunkID int64) ([]byte, error) {
 	var vector []byte
@@ -570,7 +897,10 @@ func (db *DB) GetFilteredEmbeddings(collectionID int64, sinceUnix int64, pathGlo
 		FROM embeddings e
 		JOIN chunks c ON c.id = e.chunk_id
 		JOIN files f ON f.id = c.file_id
-		WHERE (? = 0 OR f.collection_id = ?)
+		WHERE (? = 0 OR EXISTS (
+			SELECT 1 FROM file_collections fc
+			WHERE fc.file_id = f.id AND fc.collection_id = ?
+		))
 		  AND (? = 0 OR f.mtime >= ?)
 		  ` + pathFilter
 
@@ -621,7 +951,10 @@ func (db *DB) GetChunkIDsByPathGlob(pattern string, collectionID int64, sinceUni
 		JOIN files f ON f.id = c.file_id
 		WHERE 1=1
 		  ` + pathFilter + `
-		  AND (? = 0 OR f.collection_id = ?)
+		  AND (? = 0 OR EXISTS (
+			SELECT 1 FROM file_collections fc
+			WHERE fc.file_id = f.id AND fc.collection_id = ?
+		  ))
 		  AND (? = 0 OR f.mtime >= ?)`
 
 	args := append(pathArgs, collectionID, collectionID, sinceUnix, sinceUnix)
@@ -679,13 +1012,68 @@ func (db *DB) GetEmbeddingsByChunkIDs(chunkIDs []int64) ([]EmbeddingRecord, erro
 func (db *DB) InsertDeadLetter(operation, filePath, chunkInfo, errMsg, errCode string) error {
 	now := time.Now().Unix()
 	_, err := db.conn.Exec(`
-		INSERT INTO dead_letters (operation, file_path, chunk_info, error_message, error_code, attempts, first_failed_at, last_failed_at)
-		VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+		INSERT INTO dead_letters (operation, file_path, chunk_info, error_message, error_code, attempts, first_failed_at, last_failed_at, kind)
+		VALUES (?, ?, ?, ?, ?, 1, ?, ?, 'embed')
 	`, operation, filePath, chunkInfo, errMsg, errCode, now, now)
 	if err != nil {
 		return fmt.Errorf("insert dead letter: %w", err)
 	}
 	return nil
+}
+
+// InsertIndexSummaryDeadLetter records a folder-level summary failure
+// in the dead_letters table. folderPath identifies the failed folder,
+// filePath is optional (for per-file fallback failures), and errMsg
+// captures the underlying error.
+//
+// kind is set to 'index_summary' so the retry-dead-letters command can
+// dispatch on it.
+func (db *DB) InsertIndexSummaryDeadLetter(folderPath, filePath, errMsg string) error {
+	now := time.Now().Unix()
+	_, err := db.conn.Exec(`
+		INSERT INTO dead_letters (operation, file_path, chunk_info, error_message, error_code, attempts, first_failed_at, last_failed_at, kind)
+		VALUES ('index_summary', ?, ?, ?, '', 1, ?, ?, 'index_summary')
+	`, folderPath, filePath, errMsg, now, now)
+	if err != nil {
+		return fmt.Errorf("insert index summary dead letter: %w", err)
+	}
+	return nil
+}
+
+// GetUnresolvedDeadLettersByKind returns unresolved dead letters of a
+// specific kind. Pass "" to get all kinds.
+func (db *DB) GetUnresolvedDeadLettersByKind(kind string) ([]DeadLetter, error) {
+	q := `
+		SELECT id, operation, COALESCE(file_path,''), COALESCE(chunk_info,''),
+		       COALESCE(error_message,''), COALESCE(error_code,''),
+		       attempts, first_failed_at, last_failed_at,
+		       COALESCE(kind,'embed')
+		FROM dead_letters
+		WHERE resolved_at IS NULL`
+	args := []any{}
+	if kind != "" {
+		q += " AND kind = ?"
+		args = append(args, kind)
+	}
+	q += " ORDER BY last_failed_at DESC"
+
+	rows, err := db.conn.Query(q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query dead letters by kind: %w", err)
+	}
+	defer rows.Close()
+
+	var out []DeadLetter
+	for rows.Next() {
+		var dl DeadLetter
+		if err := rows.Scan(&dl.ID, &dl.Operation, &dl.FilePath, &dl.ChunkInfo,
+			&dl.ErrorMessage, &dl.ErrorCode, &dl.Attempts,
+			&dl.FirstFailed, &dl.LastFailed, &dl.Kind); err != nil {
+			return nil, fmt.Errorf("scan dead letter: %w", err)
+		}
+		out = append(out, dl)
+	}
+	return out, rows.Err()
 }
 
 // InsertAPIUsage records an API usage event.
@@ -712,6 +1100,9 @@ type DeadLetter struct {
 	Attempts     int
 	FirstFailed  int64
 	LastFailed   int64
+	// Kind discriminates row purpose: "embed" (default) or
+	// "index_summary" for AI summary failures.
+	Kind string
 }
 
 // GetUnresolvedDeadLetters returns all dead letters where resolved_at IS NULL.
@@ -719,7 +1110,8 @@ func (db *DB) GetUnresolvedDeadLetters() ([]DeadLetter, error) {
 	rows, err := db.conn.Query(`
 		SELECT id, operation, COALESCE(file_path,''), COALESCE(chunk_info,''),
 		       COALESCE(error_message,''), COALESCE(error_code,''),
-		       attempts, first_failed_at, last_failed_at
+		       attempts, first_failed_at, last_failed_at,
+		       COALESCE(kind,'embed')
 		FROM dead_letters
 		WHERE resolved_at IS NULL
 		ORDER BY last_failed_at DESC
@@ -734,7 +1126,7 @@ func (db *DB) GetUnresolvedDeadLetters() ([]DeadLetter, error) {
 		var dl DeadLetter
 		if err := rows.Scan(&dl.ID, &dl.Operation, &dl.FilePath, &dl.ChunkInfo,
 			&dl.ErrorMessage, &dl.ErrorCode, &dl.Attempts,
-			&dl.FirstFailed, &dl.LastFailed); err != nil {
+			&dl.FirstFailed, &dl.LastFailed, &dl.Kind); err != nil {
 			return nil, fmt.Errorf("scan dead letter: %w", err)
 		}
 		letters = append(letters, dl)
@@ -1009,6 +1401,115 @@ func (db *DB) ClearCache() error {
 	return nil
 }
 
+// ExtCount holds a file extension and its count.
+type ExtCount struct {
+	Ext   string
+	Count int
+}
+
+// GetFileExtensionCounts returns file counts grouped by extension, ordered by count descending.
+func (db *DB) GetFileExtensionCounts() ([]ExtCount, error) {
+	rows, err := db.conn.Query("SELECT path FROM files")
+	if err != nil {
+		return nil, fmt.Errorf("query file extensions: %w", err)
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int)
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			return nil, fmt.Errorf("scan extension path: %w", err)
+		}
+		ext := filepath.Ext(filepath.Base(path))
+		if ext == "" {
+			continue
+		}
+		counts[ext]++
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	result := make([]ExtCount, 0, len(counts))
+	for ext, count := range counts {
+		result = append(result, ExtCount{Ext: ext, Count: count})
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Count != result[j].Count {
+			return result[i].Count > result[j].Count
+		}
+		return result[i].Ext < result[j].Ext
+	})
+	return result, nil
+}
+
+// DeadLetterBreakdown holds a dead letter operation and its count.
+type DeadLetterBreakdown struct {
+	Operation string
+	Count     int
+}
+
+// GetDeadLetterBreakdown returns unresolved dead letter counts grouped by operation.
+func (db *DB) GetDeadLetterBreakdown() ([]DeadLetterBreakdown, error) {
+	rows, err := db.conn.Query(`
+		SELECT operation, COUNT(*) FROM dead_letters
+		WHERE resolved_at IS NULL
+		GROUP BY operation ORDER BY COUNT(*) DESC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("query dead letter breakdown: %w", err)
+	}
+	defer rows.Close()
+	var result []DeadLetterBreakdown
+	for rows.Next() {
+		var dl DeadLetterBreakdown
+		if err := rows.Scan(&dl.Operation, &dl.Count); err != nil {
+			return nil, fmt.Errorf("scan dead letter breakdown: %w", err)
+		}
+		result = append(result, dl)
+	}
+	return result, rows.Err()
+}
+
+// OldestUnresolvedDeadLetterTime returns the unix timestamp of the oldest unresolved dead letter.
+// Returns 0 if there are no unresolved dead letters.
+func (db *DB) OldestUnresolvedDeadLetterTime() (int64, error) {
+	var ts sql.NullInt64
+	err := db.conn.QueryRow("SELECT MIN(first_failed_at) FROM dead_letters WHERE resolved_at IS NULL").Scan(&ts)
+	if err != nil {
+		return 0, fmt.Errorf("oldest dead letter: %w", err)
+	}
+	if !ts.Valid {
+		return 0, nil
+	}
+	return ts.Int64, nil
+}
+
+// PurgeDeadLetters marks unresolved dead letters as resolved without retrying.
+// Filters by olderThanUnix (if > 0) and operation (if non-empty).
+func (db *DB) PurgeDeadLetters(olderThanUnix int64, operation string) (int, error) {
+	now := time.Now().Unix()
+	query := "UPDATE dead_letters SET resolved_at = ? WHERE resolved_at IS NULL"
+	args := []any{now}
+
+	if olderThanUnix > 0 {
+		query += " AND first_failed_at < ?"
+		args = append(args, olderThanUnix)
+	}
+	if operation != "" {
+		query += " AND operation = ?"
+		args = append(args, operation)
+	}
+
+	res, err := db.conn.Exec(query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("purge dead letters: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
 // CacheEntryCount returns the number of cache entries.
 func (db *DB) CacheEntryCount() (int, error) {
 	var count int
@@ -1017,4 +1518,185 @@ func (db *DB) CacheEntryCount() (int, error) {
 		return 0, fmt.Errorf("count cache entries: %w", err)
 	}
 	return count, nil
+}
+
+// InsertChunkV2 inserts a chunk record with section-aware fields and returns its ID.
+func (db *DB) InsertChunkV2(fileID int64, order, startLine, endLine, charCount int, sectionID, heading string, headingLevel int, chunkHash string, parentChunkID *int64) (int64, error) {
+	return insertChunkV2(db.conn, fileID, order, startLine, endLine, charCount, sectionID, heading, headingLevel, chunkHash, parentChunkID)
+}
+
+// InsertChunkV2 inserts a chunk record with section-aware fields within a transaction.
+func (t *Tx) InsertChunkV2(fileID int64, order, startLine, endLine, charCount int, sectionID, heading string, headingLevel int, chunkHash string, parentChunkID *int64) (int64, error) {
+	return insertChunkV2(t.tx, fileID, order, startLine, endLine, charCount, sectionID, heading, headingLevel, chunkHash, parentChunkID)
+}
+
+func insertChunkV2(ex execer, fileID int64, order, startLine, endLine, charCount int, sectionID, heading string, headingLevel int, chunkHash string, parentChunkID *int64) (int64, error) {
+	now := time.Now().Unix()
+	res, err := ex.Exec(
+		`INSERT INTO chunks (file_id, chunk_order, start_line, end_line, char_count, created_at, section_id, heading, heading_level, chunk_hash, parent_chunk_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		fileID, order, startLine, endLine, charCount, now, sectionID, heading, headingLevel, chunkHash, parentChunkID,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("insert chunk v2: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+// GetChunkByFileAndOrder returns a chunk by file ID and chunk order.
+// Returns nil, nil if not found.
+func (db *DB) GetChunkByFileAndOrder(fileID int64, order int) (*ChunkRecord, error) {
+	var c ChunkRecord
+	var parentID sql.NullInt64
+	err := db.conn.QueryRow(
+		`SELECT id, file_id, chunk_order, start_line, end_line, char_count, created_at,
+		        COALESCE(section_id,''), COALESCE(heading,''), COALESCE(heading_level,0),
+		        COALESCE(chunk_hash,''), parent_chunk_id
+		 FROM chunks WHERE file_id = ? AND chunk_order = ?`,
+		fileID, order,
+	).Scan(&c.ID, &c.FileID, &c.Order, &c.StartLine, &c.EndLine, &c.CharCount, &c.CreatedAt,
+		&c.SectionID, &c.Heading, &c.HeadingLevel, &c.ChunkHash, &parentID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get chunk by file and order: %w", err)
+	}
+	if parentID.Valid {
+		v := parentID.Int64
+		c.ParentChunkID = &v
+	}
+	return &c, nil
+}
+
+// InsertLink inserts a link record.
+func (db *DB) InsertLink(fileID int64, sectionID string, line int, targetPath, targetSection, linkType, raw string) error {
+	return insertLink(db.conn, fileID, sectionID, line, targetPath, targetSection, linkType, raw)
+}
+
+// InsertLink inserts a link record within a transaction.
+func (t *Tx) InsertLink(fileID int64, sectionID string, line int, targetPath, targetSection, linkType, raw string) error {
+	return insertLink(t.tx, fileID, sectionID, line, targetPath, targetSection, linkType, raw)
+}
+
+func insertLink(ex execer, fileID int64, sectionID string, line int, targetPath, targetSection, linkType, raw string) error {
+	_, err := ex.Exec(
+		`INSERT INTO links (source_file_id, source_section_id, source_line, target_path, target_section, link_type, raw)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		fileID, sectionID, line, targetPath, targetSection, linkType, raw,
+	)
+	if err != nil {
+		return fmt.Errorf("insert link: %w", err)
+	}
+	return nil
+}
+
+// DeleteLinksByFile removes all links for a file.
+func (db *DB) DeleteLinksByFile(fileID int64) error {
+	return deleteLinksByFile(db.conn, fileID)
+}
+
+// DeleteLinksByFile removes all links for a file within a transaction.
+func (t *Tx) DeleteLinksByFile(fileID int64) error {
+	return deleteLinksByFile(t.tx, fileID)
+}
+
+func deleteLinksByFile(ex execer, fileID int64) error {
+	_, err := ex.Exec("DELETE FROM links WHERE source_file_id = ?", fileID)
+	if err != nil {
+		return fmt.Errorf("delete links by file: %w", err)
+	}
+	return nil
+}
+
+// GetLinksByFileAndSection returns all links from a specific file and section.
+func (db *DB) GetLinksByFileAndSection(fileID int64, sectionID string) ([]LinkRecord, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, source_file_id, COALESCE(source_section_id,''), source_line,
+		        target_path, COALESCE(target_section,''), COALESCE(link_type,'markdown'), COALESCE(raw,'')
+		 FROM links WHERE source_file_id = ? AND source_section_id = ?
+		 ORDER BY source_line`,
+		fileID, sectionID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query links by file and section: %w", err)
+	}
+	defer rows.Close()
+
+	var links []LinkRecord
+	for rows.Next() {
+		var l LinkRecord
+		if err := rows.Scan(&l.ID, &l.SourceFileID, &l.SourceSectionID, &l.SourceLine,
+			&l.TargetPath, &l.TargetSection, &l.LinkType, &l.Raw); err != nil {
+			return nil, fmt.Errorf("scan link: %w", err)
+		}
+		links = append(links, l)
+	}
+	return links, rows.Err()
+}
+
+// GetLinksFromFile returns all links from a specific file.
+func (db *DB) GetLinksFromFile(fileID int64) ([]LinkRecord, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, source_file_id, COALESCE(source_section_id,''), source_line,
+		        target_path, COALESCE(target_section,''), COALESCE(link_type,'markdown'), COALESCE(raw,'')
+		 FROM links WHERE source_file_id = ?
+		 ORDER BY source_line`,
+		fileID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query links from file: %w", err)
+	}
+	defer rows.Close()
+
+	var links []LinkRecord
+	for rows.Next() {
+		var l LinkRecord
+		if err := rows.Scan(&l.ID, &l.SourceFileID, &l.SourceSectionID, &l.SourceLine,
+			&l.TargetPath, &l.TargetSection, &l.LinkType, &l.Raw); err != nil {
+			return nil, fmt.Errorf("scan link: %w", err)
+		}
+		links = append(links, l)
+	}
+	return links, rows.Err()
+}
+
+// GetBacklinks returns all links pointing to a target path.
+// If targetSection is empty, returns links to all sections of that path.
+// If targetSection is non-empty, returns only links to that specific section.
+func (db *DB) GetBacklinks(targetPath string, targetSection string) ([]LinkRecord, error) {
+	var rows *sql.Rows
+	var err error
+	if targetSection == "" {
+		rows, err = db.conn.Query(
+			`SELECT id, source_file_id, COALESCE(source_section_id,''), source_line,
+			        target_path, COALESCE(target_section,''), COALESCE(link_type,'markdown'), COALESCE(raw,'')
+			 FROM links WHERE target_path = ?
+			 ORDER BY source_file_id, source_line`,
+			targetPath,
+		)
+	} else {
+		rows, err = db.conn.Query(
+			`SELECT id, source_file_id, COALESCE(source_section_id,''), source_line,
+			        target_path, COALESCE(target_section,''), COALESCE(link_type,'markdown'), COALESCE(raw,'')
+			 FROM links WHERE target_path = ? AND target_section = ?
+			 ORDER BY source_file_id, source_line`,
+			targetPath, targetSection,
+		)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("query backlinks: %w", err)
+	}
+	defer rows.Close()
+
+	var links []LinkRecord
+	for rows.Next() {
+		var l LinkRecord
+		if err := rows.Scan(&l.ID, &l.SourceFileID, &l.SourceSectionID, &l.SourceLine,
+			&l.TargetPath, &l.TargetSection, &l.LinkType, &l.Raw); err != nil {
+			return nil, fmt.Errorf("scan backlink: %w", err)
+		}
+		links = append(links, l)
+	}
+	return links, rows.Err()
 }

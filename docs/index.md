@@ -25,6 +25,7 @@ sift feedback abc123 --positive a,b --negative d
 ## Key Features
 
 - **Hybrid search** — BM25 + vector embeddings + RRF fusion + neural reranking via [Voyage AI](https://www.voyageai.com/)
+- **Folder indexes** — committed `sift.toml` per folder with purpose / use_when / per-file summaries; agents call `sift index` for orientation. See [Folder Indexes](folder-indexes/overview.md).
 - **Feedback loop** — thumbs-up/down on results automatically improves future rankings via Bayesian scoring
 - **Smart previews** — results show the most relevant part of each chunk, centered on keyword matches
 - **Adaptive top-K** — score-cliff detection stops early instead of padding with low-quality results
@@ -37,7 +38,7 @@ sift feedback abc123 --positive a,b --negative d
 ## Install
 
 ```bash
-go install sift/cmd/sift@latest
+go install github.com/svilupp/sift/cmd/sift@latest
 ```
 
 Or download a binary from the [releases page](https://github.com/svilupp/sift/releases).
@@ -48,3 +49,5 @@ Or download a binary from the [releases page](https://github.com/svilupp/sift/re
 - [Configuration](configuration.md) — full `config.toml` reference
 - [Architecture](architecture.md) — how the search pipeline works
 - [CLI Reference](cli-reference.md) — every command and flag
+- [Folder Indexes](folder-indexes/overview.md) — `sift.toml`, `sift index`, agent usage
+- [Power Workflows](power-workflows.md) — copy-paste recipes
