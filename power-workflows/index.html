@@ -1,0 +1,1400 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Local-first hybrid search engine for personal knowledge files">
+      
+      
+      
+      
+        <link rel="prev" href="../architecture/">
+      
+      
+        <link rel="next" href="../cli-reference/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Power Workflows - SIFT</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#power-workflows" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="SIFT" class="md-header__button md-logo" aria-label="SIFT" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SIFT
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Power Workflows
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/svilupp/sift" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    svilupp/sift
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="SIFT" class="md-nav__button md-logo" aria-label="SIFT" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    SIFT
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/svilupp/sift" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    svilupp/sift
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power Workflows
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#search-like-an-operator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search Like an Operator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#close-the-feedback-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Close the Feedback Loop
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-links-and-anchors-deliberately" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use Links and Anchors Deliberately
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#author-stable-code-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Author Stable Code References
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#repair-drifted-code-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repair Drifted Code References
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lint-a-folder-or-repo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lint a Folder or Repo
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lint a Folder or Repo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#local-development-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Development Loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ci-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#practical-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Practical Guidance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bootstrap-your-collection-with-sifttoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bootstrap Your Collection With sift.toml
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hand-edit-a-sifttoml-purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hand-edit a sift.toml Purpose
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-sifttoml-from-an-ai-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use sift.toml From an AI Agent
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#audit-stale-summaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audit Stale Summaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recover-from-interrupted-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recover From Interrupted Generation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Folder Indexes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Folder Indexes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../folder-indexes/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../folder-indexes/format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Format reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../folder-indexes/sift-index-command/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sift index command
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../folder-indexes/refresh-and-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Refresh & generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../folder-indexes/agent-usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../daemon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../siftignore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    .siftignore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SPEC/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPEC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#search-like-an-operator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search Like an Operator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#close-the-feedback-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Close the Feedback Loop
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-links-and-anchors-deliberately" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use Links and Anchors Deliberately
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#author-stable-code-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Author Stable Code References
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#repair-drifted-code-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repair Drifted Code References
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lint-a-folder-or-repo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lint a Folder or Repo
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lint a Folder or Repo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#local-development-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Development Loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ci-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#practical-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Practical Guidance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bootstrap-your-collection-with-sifttoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bootstrap Your Collection With sift.toml
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hand-edit-a-sifttoml-purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hand-edit a sift.toml Purpose
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-sifttoml-from-an-ai-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use sift.toml From an AI Agent
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#audit-stale-summaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audit Stale Summaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recover-from-interrupted-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recover From Interrupted Generation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="power-workflows">Power Workflows</h1>
+<p>This page focuses on the highest-leverage SIFT workflows once a collection is already indexed.</p>
+<h2 id="search-like-an-operator">Search Like an Operator</h2>
+<p>Use <code>sift search</code> for indexed retrieval and <code>--file</code> for exact line-level lookup inside a few known files.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;rate limiting&quot;</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;rate limiting&quot;</span><span class="w"> </span>--pretty
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;rate limiting&quot;</span><span class="w"> </span>--collection<span class="w"> </span>work<span class="w"> </span>--since<span class="w"> </span>1w
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;rrf boost&quot;</span><span class="w"> </span>--file<span class="w"> </span>docs/architecture.md<span class="w"> </span>--file<span class="w"> </span>docs/SPEC.md
+</code></pre></div>
+<p>Use the output mode intentionally:</p>
+<ul>
+<li>Default output is compact and agent-friendly.</li>
+<li><code>--pretty</code> is for humans reading in a terminal.</li>
+<li><code>--json</code> is for automation.</li>
+<li><code>--files</code> is for piping into other tools.</li>
+<li><code>--file</code> skips the persistent index and runs a lightweight in-memory search over specific files.</li>
+</ul>
+<h2 id="close-the-feedback-loop">Close the Feedback Loop</h2>
+<p>If a search was good or bad, record that signal immediately.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;auth flow&quot;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>sift<span class="w"> </span>feedback<span class="w"> </span>abc123<span class="w"> </span>--positive<span class="w"> </span>a,b<span class="w"> </span>--negative<span class="w"> </span>d
+</code></pre></div>
+<p>This is the fastest way to improve recurring searches without changing prompts or query wording.</p>
+<h2 id="use-links-and-anchors-deliberately">Use Links and Anchors Deliberately</h2>
+<p>SIFT understands document structure, section anchors, markdown links, wikilinks, and common in-text document references such as <code>mem read ...</code>.</p>
+<p>Good patterns:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>[<span class="nt">Architecture</span>](<span class="na">docs/architecture.md#trust-zones</span>)
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>[[PLAN.2026-02-12#Overview]]
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>[<span class="nt">Local section</span>](<span class="na">#rollout-plan</span>)
+</code></pre></div>
+<p>Keep links relative where possible. Heading anchors should use the slugified heading text:</p>
+<ul>
+<li><code>## Trust Zones</code> -&gt; <code>#trust-zones</code></li>
+<li><code>## Rollout Plan</code> -&gt; <code>#rollout-plan</code></li>
+</ul>
+<p>Use <code>sift links</code> to inspect the graph:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sift<span class="w"> </span>links<span class="w"> </span>docs/architecture.md
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>sift<span class="w"> </span>links<span class="w"> </span>docs/architecture.md<span class="w"> </span>--section<span class="w"> </span>trust-zones
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>sift<span class="w"> </span>links<span class="w"> </span>docs/architecture.md<span class="w"> </span>--backlinks
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>sift<span class="w"> </span>links<span class="w"> </span>docs/architecture.md<span class="w"> </span>--json
+</code></pre></div>
+<p><code>sift links</code> is for exploration, not validation. It shows what links exist and which sections are connected.</p>
+<h2 id="author-stable-code-references">Author Stable Code References</h2>
+<p>Use plain line refs while drafting, then stamp them.</p>
+<p>Before:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>internal/search/search.go:464-475
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>internal/cli/search.go#L518
+</code></pre></div>
+<p>After <code>sift refs stamp</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>internal/search/search.go:464@w7a-475@6oh
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>internal/cli/search.go:518@ork
+</code></pre></div>
+<p>Recommended workflow:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sift<span class="w"> </span>refs<span class="w"> </span>stamp<span class="w"> </span>PLAN.md<span class="w"> </span>--check
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>sift<span class="w"> </span>refs<span class="w"> </span>stamp<span class="w"> </span>PLAN.md<span class="w"> </span>--write
+</code></pre></div>
+<p><code>stamp</code> does three things:</p>
+<ul>
+<li>fills in missing line tokens</li>
+<li>normalizes GitHub-style <code>#L12-L28</code> refs to canonical <code>:12-28</code> form</li>
+<li>preserves surrounding markdown formatting</li>
+</ul>
+<h2 id="repair-drifted-code-references">Repair Drifted Code References</h2>
+<p>Use <code>validate</code> when you want code-ref-specific inspection or safe repair.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sift<span class="w"> </span>refs<span class="w"> </span>validate<span class="w"> </span>PLAN.md
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>sift<span class="w"> </span>refs<span class="w"> </span>validate<span class="w"> </span>docs/<span class="w"> </span>--fix
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>sift<span class="w"> </span>refs<span class="w"> </span>validate<span class="w"> </span>--collection<span class="w"> </span>vault<span class="w"> </span>--path<span class="w"> </span><span class="s2">&quot;repos/**/CLAUDE.md&quot;</span><span class="w"> </span>--strict
+</code></pre></div>
+<p>Important statuses:</p>
+<ul>
+<li><code>valid_exact</code>: stored line and token still match</li>
+<li><code>valid_shifted</code>: the ref drifted, but SIFT found a unique nearby repair</li>
+<li><code>valid_unchecked</code>: the lines still exist, but the ref had no tokens</li>
+<li><code>stale</code>: the token no longer matches nearby content</li>
+<li><code>stale_ambiguous</code>: multiple nearby matches were found</li>
+<li><code>missing_file</code>: target file no longer exists</li>
+<li><code>out_of_bounds</code>: referenced lines exceed file length</li>
+</ul>
+<h2 id="lint-a-folder-or-repo">Lint a Folder or Repo</h2>
+<p>Use <code>sift refs lint</code> as the automated guardrail.</p>
+<p>It checks:</p>
+<ul>
+<li>code refs</li>
+<li>markdown links</li>
+<li>wikilinks</li>
+<li>local anchors</li>
+</ul>
+<p>Examples:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>docs/
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>docs/<span class="w"> </span>--fix
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>--collection<span class="w"> </span>vault<span class="w"> </span>--path<span class="w"> </span><span class="s2">&quot;repos/**/CLAUDE.md&quot;</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>--doc-only<span class="w"> </span>docs/
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>--code-only<span class="w"> </span>docs/
+</code></pre></div>
+<p>Behavior:</p>
+<ul>
+<li>exits non-zero on any broken file link, missing anchor, stale code ref, or unresolved target</li>
+<li><code>--fix</code> only applies safe code-ref rewrites</li>
+<li><code>--fix</code> never guesses at missing document links or anchor names</li>
+</ul>
+<p>If a folder contains illustrative <code>file:line</code> examples that are not meant to resolve against the current repo, do one of these:</p>
+<ul>
+<li>lint a narrower curated folder that only contains real references</li>
+<li>use <code>--doc-only</code> for general docs-site integrity</li>
+<li>move intentionally fake examples out of the lint target</li>
+</ul>
+<h3 id="local-development-loop">Local Development Loop</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>docs/<span class="w"> </span>--fix
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>docs/
+</code></pre></div>
+<p>Run the first command while editing. Run the second before committing.</p>
+<h3 id="ci-pattern">CI Pattern</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>docs/
+</code></pre></div>
+<p>For collection-scoped linting:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>--collection<span class="w"> </span>vault<span class="w"> </span>--path<span class="w"> </span><span class="s2">&quot;repos/**/CLAUDE.md&quot;</span>
+</code></pre></div>
+<p>This is the simplest way to enforce that a curated folder keeps its cross-references fresh.</p>
+<h2 id="practical-guidance">Practical Guidance</h2>
+<ul>
+<li>Prefer relative paths in docs. They survive moves better and keep authored refs portable.</li>
+<li>Use <code>sift links</code> to understand the current graph before rewriting a doc set.</li>
+<li>Use <code>sift refs stamp --check</code> in large docs before committing <code>--write</code>.</li>
+<li>Use <code>sift refs lint --fix</code> locally and plain <code>sift refs lint</code> in CI.</li>
+<li>If a code block is structurally important, stamp it early instead of waiting for drift.</li>
+</ul>
+<h2 id="bootstrap-your-collection-with-sifttoml">Bootstrap Your Collection With <code>sift.toml</code></h2>
+<p>First-time setup of folder indexes for a collection. Mechanical fields
+are filled by every <code>sift refresh</code>; the LLM-written <code>purpose</code>,
+<code>use_when</code>, and <code>summary</code> text needs an explicit opt-in.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># 1. Make sure the collection is registered and content is indexed.</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>sift<span class="w"> </span>collections<span class="w"> </span>add<span class="w"> </span>vault<span class="w"> </span>~/Documents/GitHub/md-tower-vault
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>sift<span class="w"> </span>refresh<span class="w"> </span>-c<span class="w"> </span>vault
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># 2. Mechanical-only sift.toml maintenance (no LLM): adds entries, hashes, counts.</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>sift<span class="w"> </span>refresh<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--index-only
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="c1"># 3. AI-bootstrap purpose / use_when / summary for every folder (slow, $$).</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="nv">DEEPINFRA_API_KEY</span><span class="o">=</span><span class="nv">$KEY</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">  </span>sift<span class="w"> </span>refresh<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--index-only<span class="w"> </span>--generate<span class="o">=</span>all<span class="w"> </span>--detach
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="c1"># 4. Watch progress (the detached run streams to ~/.sift/refresh-index.log).</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>sift<span class="w"> </span>refresh<span class="w"> </span>--status
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a><span class="c1"># 5. Inspect the result (works even if step 3 was skipped).</span>
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>sift<span class="w"> </span>index<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--orient
+</code></pre></div>
+<p>Expected output: compact JSON with a semantic digest, direct children,
+and per-file titles/summaries. Without generated fields it uses local
+extractive prose and headings.</p>
+<h2 id="hand-edit-a-sifttoml-purpose">Hand-edit a <code>sift.toml</code> Purpose</h2>
+<p>The LLM is opinionated. Sometimes it is wrong, and you want to pin a
+human-written <code>purpose</code> or <code>use_when</code> cue.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># 1. Find the file.</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nv">$EDITOR</span><span class="w"> </span>docs/architecture/sift.toml
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># 2. Edit the editorial fields. Leave the [files.&quot;*&quot;] entries alone —</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="c1">#    those are tool-managed.</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="c1">#</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="c1">#    purpose = &quot;&quot;&quot;</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="c1">#    SIFT architecture and pipeline design notes.</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="c1">#    &quot;&quot;&quot;</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="c1">#    use_when = [&quot;explain reranking&quot;, &quot;BM25 vs vector tradeoff&quot;]</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="c1"># 3. Verify the file still parses.</span>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>sift<span class="w"> </span>index<span class="w"> </span>check<span class="w"> </span>docs/architecture<span class="w"> </span>--json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>.summary
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="c1"># 4. Commit.</span>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>git<span class="w"> </span>add<span class="w"> </span>docs/architecture/sift.toml
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>git<span class="w"> </span>diff<span class="w"> </span>--cached<span class="w"> </span>docs/architecture/sift.toml
+<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>
+<a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="c1"># 5. Future refresh runs preserve hand-edits unless the freshness</span>
+<a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a><span class="c1">#    signature drifts AND --generate=stale is used.</span>
+<a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>sift<span class="w"> </span>refresh<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--index-only<span class="w">       </span><span class="c1"># safe: no LLM calls</span>
+</code></pre></div>
+<p>Expected output: <code>sift index check</code> reports <code>0 defects</code>. <code>git diff</code> is
+limited to the editorial fields you touched.</p>
+<h2 id="use-sifttoml-from-an-ai-agent">Use <code>sift.toml</code> From an AI Agent</h2>
+<p>Four-step discover → orient → search → read pattern.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># 0. Discover available collections.</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>sift<span class="w"> </span>collections<span class="w"> </span>--json
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># 1. Orient at depth 1, then drill into the most promising folder.</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>sift<span class="w"> </span>index<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--orient
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>sift<span class="w"> </span>index<span class="w"> </span>docs/agent-next-architecture<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--orient
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="c1"># 2. Search the selected branch with folder context attached.</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>sift<span class="w"> </span>search<span class="w"> </span>tool<span class="w"> </span>routing<span class="w"> </span>policy<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--path<span class="w"> </span><span class="s1">&#39;docs/agent-next-architecture/**&#39;</span><span class="w"> </span>--json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.results[] | {file, lines: &quot;\(.start_line)-\(.end_line)&quot;, folder: .folder_index.folder_path, purpose: .folder_index.folder_purpose}&#39;</span>
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="c1"># 3. Read the useful leaf or section.</span>
+<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a>sift<span class="w"> </span><span class="nb">read</span><span class="w"> </span>docs/agent-next-architecture/tools.md<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--section<span class="w"> </span>routing-policy
+</code></pre></div>
+<p>Expected output: each step yields a small JSON shape suitable for
+prompt-context injection. The <code>folder_index</code> field is present on
+every search hit whose folder has a <code>sift.toml</code>.</p>
+<h2 id="audit-stale-summaries">Audit Stale Summaries</h2>
+<p>Find and refresh entries whose freshness signature has drifted.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># 1. Lint pass: shows exact stale + missing entries (no LLM, no writes).</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>sift<span class="w"> </span>index<span class="w"> </span>check<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.summary&#39;</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="c1"># 2. Drill into a defect category.</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>sift<span class="w"> </span>index<span class="w"> </span>check<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.defects | map(select(.kind == &quot;stale&quot;)) | .[0:5]&#39;</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="c1"># 3. Targeted regeneration (only stale folders, no full rewrite).</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="nv">DEEPINFRA_API_KEY</span><span class="o">=</span><span class="nv">$KEY</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="w">  </span>sift<span class="w"> </span>refresh<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--index-only<span class="w"> </span>--generate<span class="o">=</span>stale<span class="w"> </span>--progress<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span><span class="s1">&#39;select(.event == &quot;folder_done&quot; or .event == &quot;summary&quot;) | [.event, .folder // &quot;&quot;, .ms // 0] | @tsv&#39;</span>
+</code></pre></div>
+<p>Expected output: <code>summary</code> reports a non-zero <code>stale</code> count; the
+generation pass reports <code>folders_done</code> matching that count.</p>
+<h2 id="recover-from-interrupted-generation">Recover From Interrupted Generation</h2>
+<p>A detached run may die or get rate-limited. Both are recoverable.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># 1. Check whether anything is running and what the log says.</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>sift<span class="w"> </span>refresh<span class="w"> </span>--status
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># 2. Inspect dead-letter rows (folders that exhausted retries).</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>sift<span class="w"> </span>sql<span class="w"> </span><span class="s2">&quot;SELECT id, kind, payload FROM dead_letters WHERE kind = &#39;index_summary&#39; ORDER BY id DESC LIMIT 20&quot;</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="c1"># 3. Re-queue the dead-lettered folders. This re-runs only the failures.</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="nv">DEEPINFRA_API_KEY</span><span class="o">=</span><span class="nv">$KEY</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="w">  </span>sift<span class="w"> </span>config<span class="w"> </span>retry-dead-letters
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>
+<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="c1"># 4. If a generation run was killed mid-stream, re-run with --generate=missing.</span>
+<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="c1">#    Already-completed folders are skipped because the freshness signature matches.</span>
+<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>sift<span class="w"> </span>refresh<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--index-only<span class="w"> </span>--generate<span class="o">=</span>missing<span class="w"> </span>--detach
+<a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>sift<span class="w"> </span>refresh<span class="w"> </span>--status
+</code></pre></div>
+<p>Expected output: <code>dead_letters</code> shrinks to zero after the retry; a
+follow-up <code>sift index check --require-summaries</code> reports <code>0
+missing_summary</code> defects.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

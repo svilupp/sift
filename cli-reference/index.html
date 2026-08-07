@@ -1,0 +1,3394 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Local-first hybrid search engine for personal knowledge files">
+      
+      
+      
+      
+        <link rel="prev" href="../power-workflows/">
+      
+      
+        <link rel="next" href="../folder-indexes/overview/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>CLI Reference - SIFT</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#cli-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="SIFT" class="md-header__button md-logo" aria-label="SIFT" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SIFT
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              CLI Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/svilupp/sift" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    svilupp/sift
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="SIFT" class="md-nav__button md-logo" aria-label="SIFT" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    SIFT
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/svilupp/sift" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    svilupp/sift
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../power-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#sift-search" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift search
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift search">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#folder-index-decoration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Folder-index decoration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift links
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-refs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift refs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift refs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sift-refs-stamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift refs stamp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-refs-validate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift refs validate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-refs-lint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift refs lint
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-refresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift refresh
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift refresh">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-generate-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --generate modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-progressjson-event-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --progress=json event schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift index
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift index">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#compact-orientation-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compact orientation shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#json-envelope-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON envelope shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-index-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift index check
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift read
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-feedback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift feedback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-collections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift collections
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift collections">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sift-collections-add" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift collections add
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-collections-remove" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift collections remove
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift config">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-init" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config init
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-show" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config show
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-get" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config get
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config health
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-rebuild-bm25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config rebuild-bm25
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-purge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config purge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-retry-dead-letters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config retry-dead-letters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-purge-dead-letters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config purge-dead-letters
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-sql" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift sql
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-keywords" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift keywords
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-eval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift eval
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift eval">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sift-eval-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift eval run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-eval-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift eval report
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-daemon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift daemon
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift daemon">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sift-daemon-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift daemon start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-daemon-stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift daemon stop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-daemon-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift daemon restart
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-daemon-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift daemon status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-daemon-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift daemon logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Variables
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Folder Indexes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Folder Indexes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../folder-indexes/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../folder-indexes/format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Format reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../folder-indexes/sift-index-command/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sift index command
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../folder-indexes/refresh-and-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Refresh & generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../folder-indexes/agent-usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../daemon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../siftignore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    .siftignore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SPEC/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPEC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#sift-search" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift search
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift search">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#folder-index-decoration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Folder-index decoration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift links
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-refs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift refs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift refs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sift-refs-stamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift refs stamp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-refs-validate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift refs validate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-refs-lint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift refs lint
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-refresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift refresh
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift refresh">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-generate-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --generate modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-progressjson-event-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --progress=json event schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift index
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift index">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#compact-orientation-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compact orientation shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#json-envelope-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON envelope shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-index-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift index check
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift read
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-feedback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift feedback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-collections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift collections
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift collections">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sift-collections-add" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift collections add
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-collections-remove" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift collections remove
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift config">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-init" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config init
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-show" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config show
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-get" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config get
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config health
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-rebuild-bm25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config rebuild-bm25
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-purge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config purge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-retry-dead-letters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config retry-dead-letters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-config-purge-dead-letters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift config purge-dead-letters
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-sql" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift sql
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-keywords" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift keywords
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-eval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift eval
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift eval">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sift-eval-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift eval run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-eval-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift eval report
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sift-daemon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift daemon
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sift daemon">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sift-daemon-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift daemon start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-daemon-stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift daemon stop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-daemon-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift daemon restart
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-daemon-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift daemon status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sift-daemon-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sift daemon logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Variables
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="cli-reference">CLI Reference</h1>
+<h2 id="sift-search"><code>sift search</code></h2>
+<p>Search across collections using hybrid BM25 + vector search.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sift search &lt;query&gt; [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Short</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--collection</code></td>
+<td><code>-c</code></td>
+<td>string</td>
+<td></td>
+<td>Filter by collection name.</td>
+</tr>
+<tr>
+<td><code>--path</code></td>
+<td><code>-p</code></td>
+<td>string</td>
+<td></td>
+<td>Filter by file path glob (e.g. <code>"*/topics/work/*"</code>).</td>
+</tr>
+<tr>
+<td><code>--since</code></td>
+<td></td>
+<td>string</td>
+<td></td>
+<td>Time filter: <code>2d</code>, <code>1w</code>, <code>4h</code>.</td>
+</tr>
+<tr>
+<td><code>--top-k</code></td>
+<td><code>-k</code></td>
+<td>int</td>
+<td>20</td>
+<td>Number of results. When omitted, adaptive top-K applies; explicit value falls back to <code>search.default_top_k</code> (default 20).</td>
+</tr>
+<tr>
+<td><code>--json</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Full JSON output with scores and metadata.</td>
+</tr>
+<tr>
+<td><code>--files</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>File paths only (one per line).</td>
+</tr>
+<tr>
+<td><code>--pretty</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Human-readable with colors and editor commands.</td>
+</tr>
+<tr>
+<td><code>--agent</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Agent-optimized section output without numeric scores.</td>
+</tr>
+<tr>
+<td><code>--compact</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Compact agent output grouped by file/section.</td>
+</tr>
+<tr>
+<td><code>--reverse</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Best results last. Enabled by default with <code>--pretty</code>.</td>
+</tr>
+<tr>
+<td><code>--threshold</code></td>
+<td></td>
+<td>float</td>
+<td>0.40</td>
+<td>Score threshold (only with reranking).</td>
+</tr>
+<tr>
+<td><code>--no-tips</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Suppress trailing tip line.</td>
+</tr>
+<tr>
+<td><code>--read-command</code></td>
+<td></td>
+<td>string</td>
+<td></td>
+<td>Override the drill-down command shown in agent hints, e.g. <code>"mem read"</code> from a wrapper CLI.</td>
+</tr>
+<tr>
+<td><code>--file</code></td>
+<td></td>
+<td>string[]</td>
+<td></td>
+<td>Search specific file(s) directly without using the persistent index. Repeatable.</td>
+</tr>
+<tr>
+<td><code>--sections</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Aggregate results to markdown sections when section metadata exists.</td>
+</tr>
+<tr>
+<td><code>--with-index</code></td>
+<td></td>
+<td>bool</td>
+<td>true</td>
+<td>Decorate results with folder/file context from <code>sift.toml</code>. Default ON.</td>
+</tr>
+<tr>
+<td><code>--no-index</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Strip folder/file context from results (overrides <code>--with-index</code>).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;authentication flow&quot;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;rate limiting&quot;</span><span class="w"> </span>--collection<span class="w"> </span>vault<span class="w"> </span>--since<span class="w"> </span>1w
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;API design&quot;</span><span class="w"> </span>--path<span class="w"> </span><span class="s2">&quot;*/topics/work/*&quot;</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;database migration&quot;</span><span class="w"> </span>--json
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;meeting notes&quot;</span><span class="w"> </span>--files<span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>cat
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;debugging tips&quot;</span><span class="w"> </span>--pretty<span class="w"> </span>--top-k<span class="w"> </span><span class="m">5</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;architecture&quot;</span><span class="w"> </span>--agent
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;architecture&quot;</span><span class="w"> </span>--agent<span class="w"> </span>--read-command<span class="w"> </span><span class="s2">&quot;mem read&quot;</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;rrf boost&quot;</span><span class="w"> </span>--file<span class="w"> </span>docs/architecture.md<span class="w"> </span>--file<span class="w"> </span>docs/SPEC.md
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;store id&quot;</span><span class="w"> </span>--json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.results[0].folder_index&#39;</span><span class="w">   </span><span class="c1"># decoration</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;store id&quot;</span><span class="w"> </span>--no-index<span class="w">                               </span><span class="c1"># strip decoration</span>
+</code></pre></div>
+<p><code>--read-command</code> is presentation-only. It lets wrappers keep search output self-consistent without changing how SIFT indexes or searches content.</p>
+<h3 id="folder-index-decoration">Folder-index decoration</h3>
+<p>When <code>--with-index</code> is on (the default), each result is enriched with the
+enclosing folder's <code>purpose</code> / <code>use_when</code> text from <code>sift.toml</code>. In human
+mode this appears as a grey suffix:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>[a] docs/architecture.md:42-58  [folder: docs/ - SIFT architecture overview]
+</code></pre></div>
+<p>In JSON mode each result gains a <code>folder_index</code> field:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;a&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;docs/architecture.md&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">&quot;score&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.81</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">&quot;folder_index&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">&quot;folder_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;docs&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nt">&quot;folder_purpose&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SIFT architecture overview and pipeline design.&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nt">&quot;folder_use_when&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;pipeline question&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;design rationale&quot;</span><span class="p">],</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="nt">&quot;file_summary&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Describes the BM25 + vector + RRF + rerank pipeline.&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">&quot;file_words&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">612</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="p">}</span>
+</code></pre></div>
+<p>See <a href="../folder-indexes/agent-usage/">Folder Indexes / Agent usage</a> for the full envelope.</p>
+<h2 id="sift-links"><code>sift links</code></h2>
+<p>Show forward links or backlinks for a document and, optionally, a section anchor.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sift links &lt;file&gt; [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--section</code></td>
+<td>string</td>
+<td></td>
+<td>Filter to a specific section anchor.</td>
+</tr>
+<tr>
+<td><code>--backlinks</code></td>
+<td>bool</td>
+<td></td>
+<td>Show incoming links instead of outgoing links.</td>
+</tr>
+<tr>
+<td><code>--json</code></td>
+<td>bool</td>
+<td></td>
+<td>Machine-readable output.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sift<span class="w"> </span>links<span class="w"> </span>docs/architecture.md
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>sift<span class="w"> </span>links<span class="w"> </span>docs/architecture.md<span class="w"> </span>--section<span class="w"> </span>trust-zones
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>sift<span class="w"> </span>links<span class="w"> </span>docs/architecture.md<span class="w"> </span>--backlinks
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>sift<span class="w"> </span>links<span class="w"> </span>docs/architecture.md<span class="w"> </span>--json
+</code></pre></div>
+<h2 id="sift-refs"><code>sift refs</code></h2>
+<p>Maintain code refs and lint document links.</p>
+<h3 id="sift-refs-stamp"><code>sift refs stamp</code></h3>
+<p>Add missing code-ref tokens and normalize syntax.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sift refs stamp [files-or-directories...] [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--write</code></td>
+<td>bool</td>
+<td></td>
+<td>Rewrite files in place.</td>
+</tr>
+<tr>
+<td><code>--check</code></td>
+<td>bool</td>
+<td></td>
+<td>Dry-run and fail if any file would change.</td>
+</tr>
+<tr>
+<td><code>--json</code></td>
+<td>bool</td>
+<td></td>
+<td>Machine-readable output.</td>
+</tr>
+<tr>
+<td><code>--path</code></td>
+<td>string[]</td>
+<td></td>
+<td>Glob(s) used when scanning collections or directories.</td>
+</tr>
+<tr>
+<td><code>--collection</code></td>
+<td>string[]</td>
+<td></td>
+<td>Collection(s) to scan.</td>
+</tr>
+<tr>
+<td><code>--token-length</code></td>
+<td>int</td>
+<td>3</td>
+<td>Token length to emit.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sift<span class="w"> </span>refs<span class="w"> </span>stamp<span class="w"> </span>PLAN.md<span class="w"> </span>--write
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>sift<span class="w"> </span>refs<span class="w"> </span>stamp<span class="w"> </span>docs/<span class="w"> </span>--check
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>sift<span class="w"> </span>refs<span class="w"> </span>stamp<span class="w"> </span>--collection<span class="w"> </span>vault<span class="w"> </span>--path<span class="w"> </span><span class="s2">&quot;repos/**/CLAUDE.md&quot;</span><span class="w"> </span>--write
+</code></pre></div>
+<h3 id="sift-refs-validate"><code>sift refs validate</code></h3>
+<p>Validate code refs only and optionally apply safe repairs.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sift refs validate [files-or-directories...] [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--json</code></td>
+<td>bool</td>
+<td></td>
+<td>Machine-readable output.</td>
+</tr>
+<tr>
+<td><code>--fix</code></td>
+<td>bool</td>
+<td></td>
+<td>Apply safe auto-fixes in place.</td>
+</tr>
+<tr>
+<td><code>--strict</code></td>
+<td>bool</td>
+<td></td>
+<td>Exit non-zero on stale or broken code refs.</td>
+</tr>
+<tr>
+<td><code>--window</code></td>
+<td>int</td>
+<td>120</td>
+<td>Nearby search window for shifted refs.</td>
+</tr>
+<tr>
+<td><code>--path</code></td>
+<td>string[]</td>
+<td></td>
+<td>Glob(s) used when scanning collections or directories.</td>
+</tr>
+<tr>
+<td><code>--collection</code></td>
+<td>string[]</td>
+<td></td>
+<td>Collection(s) to scan.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sift<span class="w"> </span>refs<span class="w"> </span>validate<span class="w"> </span>PLAN.md
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>sift<span class="w"> </span>refs<span class="w"> </span>validate<span class="w"> </span>docs/<span class="w"> </span>--fix
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>sift<span class="w"> </span>refs<span class="w"> </span>validate<span class="w"> </span>--collection<span class="w"> </span>vault<span class="w"> </span>--path<span class="w"> </span><span class="s2">&quot;repos/**/CLAUDE.md&quot;</span><span class="w"> </span>--strict
+</code></pre></div>
+<h3 id="sift-refs-lint"><code>sift refs lint</code></h3>
+<p>Run the strict reference linter across files or directories.</p>
+<p>Checks:</p>
+<ul>
+<li>code refs</li>
+<li>markdown links</li>
+<li>wikilinks</li>
+<li>local anchors</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sift refs lint [files-or-directories...] [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--json</code></td>
+<td>bool</td>
+<td></td>
+<td>Machine-readable output.</td>
+</tr>
+<tr>
+<td><code>--fix</code></td>
+<td>bool</td>
+<td></td>
+<td>Apply safe code-ref fixes before reporting remaining issues.</td>
+</tr>
+<tr>
+<td><code>--window</code></td>
+<td>int</td>
+<td>120</td>
+<td>Nearby search window for shifted code refs.</td>
+</tr>
+<tr>
+<td><code>--code-only</code></td>
+<td>bool</td>
+<td></td>
+<td>Lint code refs only.</td>
+</tr>
+<tr>
+<td><code>--doc-only</code></td>
+<td>bool</td>
+<td></td>
+<td>Lint markdown links and anchors only.</td>
+</tr>
+<tr>
+<td><code>--path</code></td>
+<td>string[]</td>
+<td></td>
+<td>Glob(s) used when scanning collections or directories.</td>
+</tr>
+<tr>
+<td><code>--collection</code></td>
+<td>string[]</td>
+<td></td>
+<td>Collection(s) to scan.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>docs/
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>docs/<span class="w"> </span>--fix
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>--collection<span class="w"> </span>vault<span class="w"> </span>--path<span class="w"> </span><span class="s2">&quot;repos/**/CLAUDE.md&quot;</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>--doc-only<span class="w"> </span>docs/
+</code></pre></div>
+<p><strong>Recommended usage:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># local editing loop</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>docs/<span class="w"> </span>--fix
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>docs/
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># CI</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>sift<span class="w"> </span>refs<span class="w"> </span>lint<span class="w"> </span>docs/
+</code></pre></div>
+<p>If a folder contains illustrative <code>file:line</code> examples that are not real repo refs, either lint a narrower curated folder or use <code>--doc-only</code>.</p>
+<h2 id="sift-refresh"><code>sift refresh</code></h2>
+<p>Scan collections and update the search index. Refresh also maintains
+per-folder <code>sift.toml</code> metadata in a mechanical pass (no LLM); LLM
+generation of <code>purpose</code> / <code>use_when</code> / <code>summary</code> text is opt-in.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>sift refresh [files...] [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Short</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--collection</code></td>
+<td><code>-c</code></td>
+<td>string</td>
+<td></td>
+<td>Refresh specific collection only.</td>
+</tr>
+<tr>
+<td><code>--full</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Force full reindex (ignore content hashes).</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Show what would change without writing.</td>
+</tr>
+<tr>
+<td><code>--no-index</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Skip <code>sift.toml</code> folder-index maintenance.</td>
+</tr>
+<tr>
+<td><code>--index-only</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Skip chunk/embed; run only <code>sift.toml</code> maintenance.</td>
+</tr>
+<tr>
+<td><code>--generate</code></td>
+<td></td>
+<td>string</td>
+<td><code>none</code></td>
+<td>LLM mode: <code>missing</code> | <code>stale</code> | <code>all</code> | <code>none</code>.</td>
+</tr>
+<tr>
+<td><code>--concurrency</code></td>
+<td></td>
+<td>int</td>
+<td>20</td>
+<td>Parallel folder workers for LLM generation.</td>
+</tr>
+<tr>
+<td><code>--progress</code></td>
+<td></td>
+<td>string</td>
+<td><code>auto</code></td>
+<td>Progress UX: <code>auto</code> | <code>json</code> | <code>none</code>.</td>
+</tr>
+<tr>
+<td><code>--detach</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Fork to background; logs to <code>~/.sift/</code>.</td>
+</tr>
+<tr>
+<td><code>--status</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Print status of a detached run and exit.</td>
+</tr>
+<tr>
+<td><code>--api-key</code></td>
+<td></td>
+<td>string</td>
+<td></td>
+<td>Override <code>DEEPINFRA_API_KEY</code> for this run.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>sift<span class="w"> </span>refresh<span class="w">                                    </span><span class="c1"># incremental, all collections</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>sift<span class="w"> </span>refresh<span class="w"> </span>-c<span class="w"> </span>vault<span class="w">                           </span><span class="c1"># one collection</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>sift<span class="w"> </span>refresh<span class="w"> </span>notes.md<span class="w"> </span>ideas.md<span class="w">                  </span><span class="c1"># specific files</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>sift<span class="w"> </span>refresh<span class="w"> </span>--full<span class="w">                             </span><span class="c1"># reindex everything</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>sift<span class="w"> </span>refresh<span class="w"> </span>--dry-run<span class="w">                          </span><span class="c1"># preview changes</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>sift<span class="w"> </span>refresh<span class="w"> </span>--no-index<span class="w">                         </span><span class="c1"># skip sift.toml maintenance</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>sift<span class="w"> </span>refresh<span class="w"> </span>--index-only<span class="w">                       </span><span class="c1"># only update sift.toml signatures</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>sift<span class="w"> </span>refresh<span class="w"> </span>--index-only<span class="w"> </span>--generate<span class="o">=</span>missing<span class="w">    </span><span class="c1"># AI-bootstrap empty fields</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>sift<span class="w"> </span>refresh<span class="w"> </span>--index-only<span class="w"> </span>--generate<span class="o">=</span>stale<span class="w"> </span>--progress<span class="o">=</span>json
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>sift<span class="w"> </span>refresh<span class="w"> </span>--index-only<span class="w"> </span>--generate<span class="o">=</span>all<span class="w"> </span>--detach
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>sift<span class="w"> </span>refresh<span class="w"> </span>--status<span class="w">                           </span><span class="c1"># check on a detached run</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Cannot use <code>--collection</code> with file arguments.</p>
+</div>
+<h3 id="-generate-modes"><code>--generate</code> modes</h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Calls LLM for</th>
+<th>Cost shape</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>none</code> (default)</td>
+<td>nothing</td>
+<td>free</td>
+</tr>
+<tr>
+<td><code>missing</code></td>
+<td>folders with empty <code>purpose</code>/<code>summary</code> only</td>
+<td>bounded by gaps</td>
+</tr>
+<tr>
+<td><code>stale</code></td>
+<td>folders whose freshness signature drifted</td>
+<td>bounded by churn</td>
+</tr>
+<tr>
+<td><code>all</code></td>
+<td>every folder, regardless of state</td>
+<td>full bootstrap cost</td>
+</tr>
+</tbody>
+</table>
+<p>LLM failures are recorded in <code>dead_letters</code> with <code>kind='index_summary'</code>
+and re-queued via <code>sift config retry-dead-letters</code>.</p>
+<h3 id="-progressjson-event-schema"><code>--progress=json</code> event schema</h3>
+<p>When <code>--progress=json</code>, refresh emits NDJSON to stdout (one JSON object
+per line). Common events:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{</span><span class="nt">&quot;event&quot;</span><span class="p">:</span><span class="s2">&quot;scan_done&quot;</span><span class="p">,</span><span class="nt">&quot;folders_total&quot;</span><span class="p">:</span><span class="mi">42</span><span class="p">,</span><span class="nt">&quot;stale&quot;</span><span class="p">:</span><span class="mi">7</span><span class="p">,</span><span class="nt">&quot;skipped&quot;</span><span class="p">:</span><span class="mi">35</span><span class="p">,</span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="s2">&quot;...&quot;</span><span class="p">}</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="p">{</span><span class="nt">&quot;event&quot;</span><span class="p">:</span><span class="s2">&quot;folder_start&quot;</span><span class="p">,</span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="s2">&quot;docs/architecture&quot;</span><span class="p">,</span><span class="nt">&quot;files&quot;</span><span class="p">:</span><span class="mi">4</span><span class="p">,</span><span class="nt">&quot;words&quot;</span><span class="p">:</span><span class="mi">3120</span><span class="p">}</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="p">{</span><span class="nt">&quot;event&quot;</span><span class="p">:</span><span class="s2">&quot;folder_done&quot;</span><span class="p">,</span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="s2">&quot;docs/architecture&quot;</span><span class="p">,</span><span class="nt">&quot;ms&quot;</span><span class="p">:</span><span class="mi">842</span><span class="p">,</span><span class="nt">&quot;tokens_in&quot;</span><span class="p">:</span><span class="mi">2104</span><span class="p">,</span><span class="nt">&quot;tokens_out&quot;</span><span class="p">:</span><span class="mi">312</span><span class="p">,</span><span class="nt">&quot;cost_usd&quot;</span><span class="p">:</span><span class="mf">0.0008</span><span class="p">,</span><span class="nt">&quot;attempts&quot;</span><span class="p">:</span><span class="mi">1</span><span class="p">}</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="p">{</span><span class="nt">&quot;event&quot;</span><span class="p">:</span><span class="s2">&quot;folder_error&quot;</span><span class="p">,</span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="s2">&quot;docs/legacy&quot;</span><span class="p">,</span><span class="nt">&quot;err&quot;</span><span class="p">:</span><span class="s2">&quot;rate limited&quot;</span><span class="p">,</span><span class="nt">&quot;attempts&quot;</span><span class="p">:</span><span class="mi">3</span><span class="p">,</span><span class="nt">&quot;dead_lettered&quot;</span><span class="p">:</span><span class="kc">true</span><span class="p">}</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="p">{</span><span class="nt">&quot;event&quot;</span><span class="p">:</span><span class="s2">&quot;heartbeat&quot;</span><span class="p">,</span><span class="nt">&quot;in_flight&quot;</span><span class="p">:</span><span class="mi">4</span><span class="p">,</span><span class="nt">&quot;completed&quot;</span><span class="p">:</span><span class="mi">21</span><span class="p">,</span><span class="nt">&quot;queue_remaining&quot;</span><span class="p">:</span><span class="mi">17</span><span class="p">,</span><span class="nt">&quot;elapsed_s&quot;</span><span class="p">:</span><span class="mf">12.4</span><span class="p">,</span><span class="nt">&quot;eta_s&quot;</span><span class="p">:</span><span class="mf">9.8</span><span class="p">,</span><span class="nt">&quot;spent_usd&quot;</span><span class="p">:</span><span class="mf">0.014</span><span class="p">}</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="p">{</span><span class="nt">&quot;event&quot;</span><span class="p">:</span><span class="s2">&quot;summary&quot;</span><span class="p">,</span><span class="nt">&quot;summary&quot;</span><span class="p">:{</span><span class="nt">&quot;folders_total&quot;</span><span class="p">:</span><span class="mi">42</span><span class="p">,</span><span class="nt">&quot;folders_done&quot;</span><span class="p">:</span><span class="mi">40</span><span class="p">,</span><span class="nt">&quot;folders_failed&quot;</span><span class="p">:</span><span class="mi">2</span><span class="p">,</span><span class="nt">&quot;folders_dead_lettered&quot;</span><span class="p">:</span><span class="mi">2</span><span class="p">,</span><span class="nt">&quot;wall_seconds&quot;</span><span class="p">:</span><span class="mf">31.2</span><span class="p">,</span><span class="nt">&quot;concurrency&quot;</span><span class="p">:</span><span class="mi">20</span><span class="p">,</span><span class="nt">&quot;calls_total&quot;</span><span class="p">:</span><span class="mi">42</span><span class="p">,</span><span class="nt">&quot;tokens_in&quot;</span><span class="p">:</span><span class="mi">80312</span><span class="p">,</span><span class="nt">&quot;tokens_out&quot;</span><span class="p">:</span><span class="mi">7042</span><span class="p">}}</span>
+</code></pre></div>
+<p>See <a href="../folder-indexes/refresh-and-generation/">Folder Indexes / Refresh &amp; generation</a> for the full event reference.</p>
+<h2 id="sift-index"><code>sift index</code></h2>
+<p>Read or lint per-folder <code>sift.toml</code> metadata. With no subcommand, walks
+the tree and emits a structured table of contents (purpose / use_when /
+per-file summaries). On a TTY the default is markdown; piped, JSON.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>sift index [path] [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Short</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--collection</code></td>
+<td><code>-c</code></td>
+<td>string</td>
+<td></td>
+<td>Walk this collection's root path.</td>
+</tr>
+<tr>
+<td><code>--depth</code></td>
+<td></td>
+<td>int</td>
+<td>-1</td>
+<td>Limit descent depth (<code>0</code>=root, <code>1</code>=children, <code>-1</code>=unbounded).</td>
+</tr>
+<tr>
+<td><code>--orient</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Emit compact semantic JSON; defaults to depth 1.</td>
+</tr>
+<tr>
+<td><code>--json</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Emit JSON envelope.</td>
+</tr>
+<tr>
+<td><code>--markdown</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Emit markdown tree.</td>
+</tr>
+<tr>
+<td><code>--include-ignored</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Include folders/files marked <code>ignore = true</code>.</td>
+</tr>
+<tr>
+<td><code>--sections</code></td>
+<td></td>
+<td>bool</td>
+<td>(auto)</td>
+<td>Include H1/H2 outlines per file. On for JSON, off for markdown.</td>
+</tr>
+<tr>
+<td><code>--summaries</code></td>
+<td></td>
+<td>bool</td>
+<td>true</td>
+<td>Include editorial purpose/summaries; false keeps local extractive orientation.</td>
+</tr>
+<tr>
+<td><code>--path</code></td>
+<td><code>-p</code></td>
+<td>string</td>
+<td></td>
+<td>Glob filter applied to file paths (e.g. <code>docs/**</code>).</td>
+</tr>
+<tr>
+<td><code>--since</code></td>
+<td></td>
+<td>string</td>
+<td></td>
+<td>Only include files modified within the duration (e.g. <code>7d</code>).</td>
+</tr>
+<tr>
+<td><code>--file</code></td>
+<td></td>
+<td>string[]</td>
+<td></td>
+<td>Only include this file path (repeatable).</td>
+</tr>
+</tbody>
+</table>
+<p>With <code>--collection</code>, <code>[path]</code> is collection-relative. Returned paths
+remain collection-relative for direct reuse. Format auto-detection:
+stdout is a TTY → <code>markdown</code>, piped → <code>json</code>.
+Pass <code>--json</code> or <code>--markdown</code> to override. <code>--json</code> and <code>--markdown</code> are
+mutually exclusive.</p>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>sift<span class="w"> </span>collections<span class="w"> </span>--json<span class="w">                   </span><span class="c1"># discover collection names</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>sift<span class="w"> </span>index<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--orient<span class="w">              </span><span class="c1"># semantic root + direct children</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>sift<span class="w"> </span>index<span class="w"> </span>docs<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--orient<span class="w">         </span><span class="c1"># drill into a branch</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>sift<span class="w"> </span>index<span class="w"> </span>docs<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--json<span class="w">           </span><span class="c1"># detailed subtree + line ranges</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>sift<span class="w"> </span>index<span class="w"> </span>--path<span class="w"> </span><span class="s1">&#39;docs/**&#39;</span><span class="w"> </span>--since<span class="w"> </span>7d<span class="w">    </span><span class="c1"># AND-combined filters</span>
+</code></pre></div>
+<h3 id="compact-orientation-shape">Compact orientation shape</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="p">{</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="nt">&quot;schema_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span><span class="nt">&quot;collection&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vault&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span><span class="nt">&quot;root&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/Users/me/vault&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">  </span><span class="nt">&quot;sub_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;docs&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">  </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;docs — Architecture: Explains the system boundaries.&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="w">  </span><span class="nt">&quot;stats&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;folder_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;file_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;total_words&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4200</span><span class="p">},</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="w">  </span><span class="nt">&quot;folders&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="w">    </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;docs&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="w">    </span><span class="nt">&quot;purpose&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Architecture: Explains the system boundaries.&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="w">    </span><span class="nt">&quot;purpose_source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;extractive&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="w">    </span><span class="nt">&quot;children&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;architecture&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;guides&quot;</span><span class="p">],</span>
+<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="w">    </span><span class="nt">&quot;files&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span>
+<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a><span class="w">      </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;docs/README.md&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a><span class="w">      </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Documentation&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a><span class="w">      </span><span class="nt">&quot;summary&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Explains how to navigate the project documentation.&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-17" name="__codelineno-18-17" href="#__codelineno-18-17"></a><span class="w">      </span><span class="nt">&quot;summary_source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;extractive&quot;</span><span class="p">,</span>
+<a id="__codelineno-18-18" name="__codelineno-18-18" href="#__codelineno-18-18"></a><span class="w">      </span><span class="nt">&quot;topics&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Quick start&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Concepts&quot;</span><span class="p">],</span>
+<a id="__codelineno-18-19" name="__codelineno-18-19" href="#__codelineno-18-19"></a><span class="w">      </span><span class="nt">&quot;words&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">640</span>
+<a id="__codelineno-18-20" name="__codelineno-18-20" href="#__codelineno-18-20"></a><span class="w">    </span><span class="p">}]</span>
+<a id="__codelineno-18-21" name="__codelineno-18-21" href="#__codelineno-18-21"></a><span class="w">  </span><span class="p">}]</span>
+<a id="__codelineno-18-22" name="__codelineno-18-22" href="#__codelineno-18-22"></a><span class="p">}</span>
+</code></pre></div>
+<p><code>editorial</code> means the text came from <code>sift.toml</code>. <code>extractive</code>,
+<code>headings</code>, and <code>title</code> are deterministic local fallbacks and never call
+an AI provider. Use <code>--orient --summaries=false</code> to ignore all editorial
+fields and inspect the strictly local extractive view.</p>
+<h3 id="json-envelope-shape">JSON envelope shape</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p">{</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">  </span><span class="nt">&quot;schema_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">  </span><span class="nt">&quot;collection&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vault&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">  </span><span class="nt">&quot;root&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/Users/me/vault&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">  </span><span class="nt">&quot;sub_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;docs&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">  </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;docs/ - architecture overview ... 12 folders, 84 files&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">  </span><span class="nt">&quot;stats&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="w">    </span><span class="nt">&quot;folder_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="w">    </span><span class="nt">&quot;file_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">84</span><span class="p">,</span>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="w">    </span><span class="nt">&quot;total_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">412938</span><span class="p">,</span>
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="w">    </span><span class="nt">&quot;total_words&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">51284</span><span class="p">,</span>
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a><span class="w">    </span><span class="nt">&quot;newest_mtime&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-05-01T12:14:33Z&quot;</span>
+<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a><span class="w">  </span><span class="nt">&quot;folders&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a><span class="w">    </span><span class="p">{</span>
+<a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a><span class="w">      </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;docs&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-17" name="__codelineno-19-17" href="#__codelineno-19-17"></a><span class="w">      </span><span class="nt">&quot;depth&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-19-18" name="__codelineno-19-18" href="#__codelineno-19-18"></a><span class="w">      </span><span class="nt">&quot;has_index&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-19-19" name="__codelineno-19-19" href="#__codelineno-19-19"></a><span class="w">      </span><span class="nt">&quot;purpose&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SIFT architecture overview.&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-20" name="__codelineno-19-20" href="#__codelineno-19-20"></a><span class="w">      </span><span class="nt">&quot;use_when&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;pipeline question&quot;</span><span class="p">],</span>
+<a id="__codelineno-19-21" name="__codelineno-19-21" href="#__codelineno-19-21"></a><span class="w">      </span><span class="nt">&quot;file_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<a id="__codelineno-19-22" name="__codelineno-19-22" href="#__codelineno-19-22"></a><span class="w">      </span><span class="nt">&quot;word_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3120</span><span class="p">,</span>
+<a id="__codelineno-19-23" name="__codelineno-19-23" href="#__codelineno-19-23"></a><span class="w">      </span><span class="nt">&quot;last_modified&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-05-01T12:14:33Z&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-24" name="__codelineno-19-24" href="#__codelineno-19-24"></a><span class="w">      </span><span class="nt">&quot;files&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-19-25" name="__codelineno-19-25" href="#__codelineno-19-25"></a><span class="w">        </span><span class="p">{</span>
+<a id="__codelineno-19-26" name="__codelineno-19-26" href="#__codelineno-19-26"></a><span class="w">          </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;docs/architecture.md&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-27" name="__codelineno-19-27" href="#__codelineno-19-27"></a><span class="w">          </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;md&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-28" name="__codelineno-19-28" href="#__codelineno-19-28"></a><span class="w">          </span><span class="nt">&quot;bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8420</span><span class="p">,</span>
+<a id="__codelineno-19-29" name="__codelineno-19-29" href="#__codelineno-19-29"></a><span class="w">          </span><span class="nt">&quot;words&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1240</span><span class="p">,</span>
+<a id="__codelineno-19-30" name="__codelineno-19-30" href="#__codelineno-19-30"></a><span class="w">          </span><span class="nt">&quot;mtime&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-04-30T18:02:11Z&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-31" name="__codelineno-19-31" href="#__codelineno-19-31"></a><span class="w">          </span><span class="nt">&quot;content_hash&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1f2a...&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-32" name="__codelineno-19-32" href="#__codelineno-19-32"></a><span class="w">          </span><span class="nt">&quot;summary&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Describes the BM25 + vector pipeline.&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-33" name="__codelineno-19-33" href="#__codelineno-19-33"></a><span class="w">          </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Architecture&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-34" name="__codelineno-19-34" href="#__codelineno-19-34"></a><span class="w">          </span><span class="nt">&quot;excerpt&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Explains the search and indexing pipeline.&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-35" name="__codelineno-19-35" href="#__codelineno-19-35"></a><span class="w">          </span><span class="nt">&quot;exists&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-19-36" name="__codelineno-19-36" href="#__codelineno-19-36"></a><span class="w">          </span><span class="nt">&quot;sections&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-19-37" name="__codelineno-19-37" href="#__codelineno-19-37"></a><span class="w">            </span><span class="p">{</span><span class="nt">&quot;heading&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Data Flow&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;start_line&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;end_line&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">24</span><span class="p">}</span>
+<a id="__codelineno-19-38" name="__codelineno-19-38" href="#__codelineno-19-38"></a><span class="w">          </span><span class="p">]</span>
+<a id="__codelineno-19-39" name="__codelineno-19-39" href="#__codelineno-19-39"></a><span class="w">        </span><span class="p">}</span>
+<a id="__codelineno-19-40" name="__codelineno-19-40" href="#__codelineno-19-40"></a><span class="w">      </span><span class="p">]</span>
+<a id="__codelineno-19-41" name="__codelineno-19-41" href="#__codelineno-19-41"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-19-42" name="__codelineno-19-42" href="#__codelineno-19-42"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-19-43" name="__codelineno-19-43" href="#__codelineno-19-43"></a><span class="w">  </span><span class="nt">&quot;errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<a id="__codelineno-19-44" name="__codelineno-19-44" href="#__codelineno-19-44"></a><span class="p">}</span>
+</code></pre></div>
+<p>The <code>digest</code> field is a one-paragraph human/agent orientation generated
+from the tree. See <a href="../folder-indexes/sift-index-command/">Folder Indexes / <code>sift index</code> deep dive</a>.</p>
+<h3 id="sift-index-check"><code>sift index check</code></h3>
+<p>Lint <code>sift.toml</code> files in a tree. No writes, no LLM calls. Reports
+missing files, parse errors, stale entries, orphaned entries, and
+unsupported schema versions. Missing summaries are optional.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>sift index check [path] [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Short</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--collection</code></td>
+<td><code>-c</code></td>
+<td>string</td>
+<td></td>
+<td>Walk this collection's root path.</td>
+</tr>
+<tr>
+<td><code>--json</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Emit JSON.</td>
+</tr>
+<tr>
+<td><code>--markdown</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Emit pasteable markdown checklist.</td>
+</tr>
+<tr>
+<td><code>--include-ignored</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Lint folders/files marked <code>ignore = true</code> too.</td>
+</tr>
+<tr>
+<td><code>--all</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Include non-text files (e.g. <code>.go</code>, <code>.py</code>, <code>.rs</code>) in orphan checks.</td>
+</tr>
+<tr>
+<td><code>--require-summaries</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Report empty file summaries as defects.</td>
+</tr>
+<tr>
+<td><code>--path</code></td>
+<td><code>-p</code></td>
+<td>string</td>
+<td></td>
+<td>Glob filter applied to file paths.</td>
+</tr>
+<tr>
+<td><code>--since</code></td>
+<td></td>
+<td>string</td>
+<td></td>
+<td>Duration filter (e.g. <code>7d</code>).</td>
+</tr>
+<tr>
+<td><code>--file</code></td>
+<td></td>
+<td>string[]</td>
+<td></td>
+<td>Only include this file path (repeatable).</td>
+</tr>
+</tbody>
+</table>
+<p>Format auto-detection: TTY → human, piped → JSON. Override with <code>--json</code>
+or <code>--markdown</code>. <code>--json</code> and <code>--markdown</code> are mutually exclusive.</p>
+<p><strong>Exit codes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>no defects</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>tool error (bad path, IO failure)</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td>defects found (lint-style)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>sift<span class="w"> </span>index<span class="w"> </span>check<span class="w">                              </span><span class="c1"># current directory</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>sift<span class="w"> </span>index<span class="w"> </span>check<span class="w"> </span>./docs
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>sift<span class="w"> </span>index<span class="w"> </span>check<span class="w"> </span>--collection<span class="w"> </span>vault
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>sift<span class="w"> </span>index<span class="w"> </span>check<span class="w"> </span>--collection<span class="w"> </span>vault<span class="w"> </span>--require-summaries
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>sift<span class="w"> </span>index<span class="w"> </span>check<span class="w"> </span>./docs<span class="w"> </span>--json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>.summary
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>sift<span class="w"> </span>index<span class="w"> </span>check<span class="w"> </span>./docs<span class="w"> </span>--markdown<span class="w"> </span>&gt;<span class="w"> </span>REPORT.md
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>sift<span class="w"> </span>index<span class="w"> </span>check<span class="w"> </span>--path<span class="w"> </span><span class="s1">&#39;docs/**&#39;</span>
+</code></pre></div>
+<p>See <a href="../folder-indexes/overview/">Folder Indexes / overview</a> for what defects
+mean and how to fix them.</p>
+<h2 id="sift-read"><code>sift read</code></h2>
+<p>Read a file, exact line range, or Markdown section without an editor or
+API call. With <code>--collection</code>, the file is collection-relative.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>sift read &lt;file&gt; [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Short</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--collection</code></td>
+<td><code>-c</code></td>
+<td>string</td>
+<td></td>
+<td>Resolve the file inside this collection.</td>
+</tr>
+<tr>
+<td><code>--section</code></td>
+<td></td>
+<td>string</td>
+<td></td>
+<td>Heading title or slug, such as <code>Data Flow</code> or <code>data-flow</code>; numeric prefixes are optional.</td>
+</tr>
+<tr>
+<td><code>--start-line</code></td>
+<td></td>
+<td>int</td>
+<td>1</td>
+<td>First line to read.</td>
+</tr>
+<tr>
+<td><code>--end-line</code></td>
+<td></td>
+<td>int</td>
+<td>EOF</td>
+<td>Last line to read.</td>
+</tr>
+<tr>
+<td><code>--json</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Emit <code>{file, section, start_line, end_line, content}</code>.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>sift<span class="w"> </span><span class="nb">read</span><span class="w"> </span>docs/architecture.md<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--section<span class="w"> </span>data-flow
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>sift<span class="w"> </span><span class="nb">read</span><span class="w"> </span>docs/architecture.md<span class="w"> </span>-c<span class="w"> </span>vault<span class="w"> </span>--start-line<span class="w"> </span><span class="m">40</span><span class="w"> </span>--end-line<span class="w"> </span><span class="m">80</span><span class="w"> </span>--json
+</code></pre></div>
+<h2 id="sift-feedback"><code>sift feedback</code></h2>
+<p>Record positive or negative feedback on search results to improve future rankings.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>sift feedback &lt;search_id&gt; [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--positive</code></td>
+<td>string</td>
+<td></td>
+<td>Comma-separated result labels (e.g. <code>a,b</code>).</td>
+</tr>
+<tr>
+<td><code>--negative</code></td>
+<td>string</td>
+<td></td>
+<td>Comma-separated result labels (e.g. <code>c,d</code>).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>sift<span class="w"> </span>search<span class="w"> </span><span class="s2">&quot;auth flow&quot;</span><span class="w">                          </span><span class="c1"># header shows id:abc123</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>sift<span class="w"> </span>feedback<span class="w"> </span>abc123<span class="w"> </span>--positive<span class="w"> </span>a,b<span class="w"> </span>--negative<span class="w"> </span>d
+</code></pre></div>
+<h2 id="sift-collections"><code>sift collections</code></h2>
+<p>Manage indexed collections. Run bare <code>sift collections</code> to list all, or
+<code>sift collections --json</code> for the stable agent discovery envelope:
+<code>{"collections":[{"name","path","file_count","tags"}]}</code>.</p>
+<h3 id="sift-collections-add"><code>sift collections add</code></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>sift collections add &lt;name&gt; &lt;path&gt; [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--tags</code></td>
+<td>string</td>
+<td></td>
+<td>Comma-separated tags.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>sift<span class="w"> </span>collections<span class="w"> </span>add<span class="w"> </span>vault<span class="w"> </span>~/docs/vault/
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>sift<span class="w"> </span>collections<span class="w"> </span>add<span class="w"> </span>work<span class="w"> </span>~/projects/<span class="w"> </span>--tags<span class="w"> </span>work,code
+</code></pre></div>
+<h3 id="sift-collections-remove"><code>sift collections remove</code></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>sift collections remove &lt;name&gt; [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--force</code></td>
+<td>bool</td>
+<td></td>
+<td>Skip confirmation prompt.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="sift-config"><code>sift config</code></h2>
+<p>Configuration and administration.</p>
+<h3 id="sift-config-init"><code>sift config init</code></h3>
+<p>Initialize SIFT. Creates <code>~/.sift/</code> with default config and empty database. Safe to re-run.</p>
+<h3 id="sift-config-show"><code>sift config show</code></h3>
+<p>Print current configuration as TOML.</p>
+<h3 id="sift-config-set"><code>sift config set</code></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>sift config set &lt;key&gt; &lt;value&gt;
+</code></pre></div>
+<p>Set a config value using dot-notation keys. See <a href="../configuration/">Configuration</a> for all keys.</p>
+<h3 id="sift-config-get"><code>sift config get</code></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>sift config get &lt;key&gt;
+</code></pre></div>
+<p>Read a config value.</p>
+<h3 id="sift-config-stats"><code>sift config stats</code></h3>
+<p>Show usage statistics: collections, file/chunk counts, API usage, feedback totals, storage sizes.</p>
+<h3 id="sift-config-health"><code>sift config health</code></h3>
+<p>Run system health checks: config file, database, Bleve index consistency, API key status, dead letters, stale files.</p>
+<h3 id="sift-config-logs"><code>sift config logs</code></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>sift config logs [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--feedback</code></td>
+<td>bool</td>
+<td></td>
+<td>Show feedback logs instead of search logs.</td>
+</tr>
+<tr>
+<td><code>--sql</code></td>
+<td>bool</td>
+<td></td>
+<td>Show SQL query logs.</td>
+</tr>
+<tr>
+<td><code>--count</code></td>
+<td>int</td>
+<td>20</td>
+<td>Number of entries to show.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sift-config-rebuild-bm25"><code>sift config rebuild-bm25</code></h3>
+<p>Destroy and recreate the Bleve BM25 index from chunks in SQLite. Use when <code>sift config health</code> reports index drift.</p>
+<h3 id="sift-config-purge"><code>sift config purge</code></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>sift config purge [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Short</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--force</code></td>
+<td></td>
+<td>bool</td>
+<td></td>
+<td>Skip confirmation.</td>
+</tr>
+<tr>
+<td><code>--collection</code></td>
+<td><code>-c</code></td>
+<td>string</td>
+<td></td>
+<td>Purge only this collection.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sift-config-retry-dead-letters"><code>sift config retry-dead-letters</code></h3>
+<p>Retry failed operations from the <code>dead_letters</code> table. Handles both
+embedding failures (<code>kind='embedding'</code>) and <code>sift.toml</code> summary
+generation failures (<code>kind='index_summary'</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--operation</code></td>
+<td>string</td>
+<td></td>
+<td>Filter by operation type (<code>embed</code>, <code>rerank</code>).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sift-config-purge-dead-letters"><code>sift config purge-dead-letters</code></h3>
+<p>Mark dead letters as resolved without retrying the failed operations.
+Useful for clearing noise from transient failures.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>sift config purge-dead-letters [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--all</code></td>
+<td>bool</td>
+<td></td>
+<td>Resolve all unresolved dead letters.</td>
+</tr>
+<tr>
+<td><code>--older-than</code></td>
+<td>string</td>
+<td></td>
+<td>Resolve dead letters older than the duration (e.g. <code>7d</code>, <code>2w</code>).</td>
+</tr>
+<tr>
+<td><code>--operation</code></td>
+<td>string</td>
+<td></td>
+<td>Filter by operation type (<code>embed</code>, <code>rerank</code>).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>sift<span class="w"> </span>config<span class="w"> </span>purge-dead-letters<span class="w"> </span>--all
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>sift<span class="w"> </span>config<span class="w"> </span>purge-dead-letters<span class="w"> </span>--older-than<span class="w"> </span>7d
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>sift<span class="w"> </span>config<span class="w"> </span>purge-dead-letters<span class="w"> </span>--operation<span class="w"> </span>rerank
+</code></pre></div>
+<h2 id="sift-sql"><code>sift sql</code></h2>
+<p>Run a read-only SQL query against the SIFT SQLite database.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>sift sql &lt;query&gt; [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--limit</code></td>
+<td>int</td>
+<td>100</td>
+<td>Maximum rows to display.</td>
+</tr>
+<tr>
+<td><code>--schema</code></td>
+<td>bool</td>
+<td></td>
+<td>Print all table schemas instead of running a query.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Internal debugging tool. The schema may change between versions.</p>
+</div>
+<p><strong>Tables:</strong> <code>collections</code>, <code>files</code>, <code>file_collections</code>, <code>chunks</code>, <code>embeddings</code>, <code>feedback</code>, <code>dead_letters</code>, <code>api_usage</code>, <code>search_sessions</code>, <code>search_cache</code>, <code>links</code>, <code>backlink_counts</code>, <code>read_counts</code>, <code>schema_version</code> — full column lists via <code>sift sql --schema</code>.</p>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>sift<span class="w"> </span>sql<span class="w"> </span><span class="s2">&quot;SELECT name, path FROM collections&quot;</span>
+<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>sift<span class="w"> </span>sql<span class="w"> </span><span class="s2">&quot;SELECT COUNT(*) FROM chunks&quot;</span>
+<a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>sift<span class="w"> </span>sql<span class="w"> </span><span class="s2">&quot;SELECT path, chunk_count FROM files ORDER BY mtime DESC LIMIT 10&quot;</span>
+<a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a>sift<span class="w"> </span>sql<span class="w"> </span>--schema
+</code></pre></div>
+<h2 id="sift-keywords"><code>sift keywords</code></h2>
+<p>Extract high-signal keywords per directory using filename, heading, and body weighting.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>sift keywords [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--collection</code></td>
+<td>string</td>
+<td></td>
+<td>Restrict to a collection.</td>
+</tr>
+<tr>
+<td><code>--path</code></td>
+<td>string</td>
+<td></td>
+<td>Restrict to relative file paths matching a glob.</td>
+</tr>
+<tr>
+<td><code>--depth</code></td>
+<td>int</td>
+<td>2</td>
+<td>Directory depth to group by.</td>
+</tr>
+<tr>
+<td><code>--top</code></td>
+<td>int</td>
+<td>8</td>
+<td>Top keywords per group.</td>
+</tr>
+<tr>
+<td><code>--json</code></td>
+<td>bool</td>
+<td></td>
+<td>JSON output.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>sift<span class="w"> </span>keywords
+<a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>sift<span class="w"> </span>keywords<span class="w"> </span>--collection<span class="w"> </span>vault
+<a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>sift<span class="w"> </span>keywords<span class="w"> </span>--path<span class="w"> </span><span class="s2">&quot;memory/*&quot;</span><span class="w"> </span>--depth<span class="w"> </span><span class="m">2</span><span class="w"> </span>--top<span class="w"> </span><span class="m">8</span>
+<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a>sift<span class="w"> </span>keywords<span class="w"> </span>--json
+</code></pre></div>
+<h2 id="sift-eval"><code>sift eval</code></h2>
+<p>Run anchor and link expansion experiments against test corpora. Used for
+internal regression testing of search-quality variants.</p>
+<h3 id="sift-eval-run"><code>sift eval run</code></h3>
+<p>Set up a temporary sift instance, index a corpus, run eval cases, and
+write a JSON results file.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>sift eval run [flags]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--cases</code></td>
+<td>string</td>
+<td></td>
+<td>Path to JSONL cases file.</td>
+</tr>
+<tr>
+<td><code>--corpus</code></td>
+<td>string</td>
+<td></td>
+<td>Path to corpus directory.</td>
+</tr>
+<tr>
+<td><code>--collection</code></td>
+<td>string</td>
+<td></td>
+<td>Collection name.</td>
+</tr>
+<tr>
+<td><code>--variant</code></td>
+<td>string</td>
+<td><code>all</code></td>
+<td>Variant: <code>v0</code>, <code>v1</code>, <code>v2</code>, <code>v3</code>, <code>v4</code>, or <code>all</code>.</td>
+</tr>
+<tr>
+<td><code>--top-k</code></td>
+<td>int</td>
+<td>10</td>
+<td>Number of results to evaluate.</td>
+</tr>
+<tr>
+<td><code>--decay</code></td>
+<td>float</td>
+<td>0.5</td>
+<td>Link expansion decay factor (v2, v4).</td>
+</tr>
+<tr>
+<td><code>--heading-boost</code></td>
+<td>float</td>
+<td>2</td>
+<td>Heading boost factor (v3, v4).</td>
+</tr>
+<tr>
+<td><code>--hybrid</code></td>
+<td>bool</td>
+<td></td>
+<td>Use full hybrid search (embeddings + reranking).</td>
+</tr>
+<tr>
+<td><code>--output</code></td>
+<td>string</td>
+<td><code>eval_results.json</code></td>
+<td>Output file path.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sift-eval-report"><code>sift eval report</code></h3>
+<p>Display a previously-written eval results file.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>sift eval report &lt;results.json&gt;
+</code></pre></div>
+<h2 id="sift-daemon"><code>sift daemon</code></h2>
+<p>Manage the long-lived sift daemon process. The daemon serves search and
+refresh requests over a Unix socket, amortising the Voyage TLS handshake
+and SQLite/Bleve open cost across calls. See the <a href="../daemon/">Daemon</a> page
+for the full design and wire protocol.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>sift daemon [start|stop|restart|status|logs]
+</code></pre></div>
+<p>The CLI auto-spawns the daemon on first search; manual lifecycle is only
+needed for power users and after editing <code>config.toml</code>.</p>
+<h3 id="sift-daemon-start"><code>sift daemon start</code></h3>
+<p>Spawn the daemon if not already running, then poll <code>/health</code> until ready.</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--timeout</code></td>
+<td>string</td>
+<td>(config)</td>
+<td>Time to wait for readiness (e.g. <code>500ms</code>, <code>2s</code>). Defaults to <code>daemon.spawn_timeout</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sift-daemon-stop"><code>sift daemon stop</code></h3>
+<p>Terminate the daemon. Tries <code>POST /shutdown</code>, then SIGTERM, then SIGKILL.
+Idempotent: exits 0 with a "not running" message if no daemon is up.</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--timeout</code></td>
+<td>string</td>
+<td><code>5s</code></td>
+<td>Maximum time to wait for shutdown.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sift-daemon-restart"><code>sift daemon restart</code></h3>
+<p>Stop and start the daemon in one step. Useful after upgrading the binary
+or editing <code>~/.sift/config.toml</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--timeout</code></td>
+<td>string</td>
+<td><code>5s</code></td>
+<td>Maximum time to wait for the cycle.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sift-daemon-status"><code>sift daemon status</code></h3>
+<p>Print whether the daemon is running, with PID, uptime, and request count.</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--json</code></td>
+<td>bool</td>
+<td></td>
+<td>Emit machine-readable JSON.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exit codes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>running</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>not running</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td>unhealthy (PID file present but socket unreachable)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sift-daemon-logs"><code>sift daemon logs</code></h3>
+<p>Print or tail <code>~/.sift/logs/daemon.log</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Short</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--tail</code></td>
+<td><code>-n</code></td>
+<td>int</td>
+<td>50</td>
+<td>Number of trailing lines to print.</td>
+</tr>
+<tr>
+<td><code>--follow</code></td>
+<td><code>-f</code></td>
+<td>bool</td>
+<td></td>
+<td>Tail the log, printing new lines as they arrive.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>sift<span class="w"> </span>daemon<span class="w"> </span>status
+<a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>sift<span class="w"> </span>daemon<span class="w"> </span>status<span class="w"> </span>--json
+<a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a>sift<span class="w"> </span>daemon<span class="w"> </span>logs<span class="w"> </span>-n<span class="w"> </span><span class="m">100</span>
+<a id="__codelineno-42-4" name="__codelineno-42-4" href="#__codelineno-42-4"></a>sift<span class="w"> </span>daemon<span class="w"> </span>logs<span class="w"> </span>-f
+<a id="__codelineno-42-5" name="__codelineno-42-5" href="#__codelineno-42-5"></a>sift<span class="w"> </span>daemon<span class="w"> </span>restart<span class="w">           </span><span class="c1"># after editing config.toml</span>
+</code></pre></div>
+<h2 id="environment-variables">Environment Variables</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SIFT_DIR</code></td>
+<td>Override <code>~/.sift/</code> data directory (relocates socket, PID, logs, db).</td>
+</tr>
+<tr>
+<td><code>SIFT_NO_DAEMON</code></td>
+<td>Any non-empty value disables daemon dial/spawn; CLI runs in-process.</td>
+</tr>
+<tr>
+<td><code>SIFT_DAEMON_SOCKET</code></td>
+<td>Override socket path (<code>~/.sift/sift.sock</code>). Test hook.</td>
+</tr>
+<tr>
+<td><code>SIFT_DAEMON_SPAWNED</code></td>
+<td>Set automatically when spawning the daemon child. Not for end-user use.</td>
+</tr>
+<tr>
+<td><code>DEEPINFRA_API_KEY</code></td>
+<td>API key for AI-generated <code>sift.toml</code> summaries. Required by <code>sift refresh --generate=...</code>.</td>
+</tr>
+<tr>
+<td><code>VOYAGE_API_KEY</code></td>
+<td>Read by <code>sift config init</code> as a default for <code>api.voyage_api_key</code>.</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
