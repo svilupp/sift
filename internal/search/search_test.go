@@ -186,6 +186,88 @@ func TestSearchBM25Only(t *testing.T) {
 	}
 }
 
+func TestNewEngineTreatsEmptyKeyClientAsBM25Only(t *testing.T) {
+	client := voyage.NewClientWithBaseURL("  ", "http://127.0.0.1:1")
+	engine := NewEngine(nil, nil, client, config.Default())
+	if engine.Voyage != nil {
+		t.Fatal("NewEngine retained an empty-key Voyage client")
+	}
+}
+
+func TestSearchSendsOriginalQueryToReranker(t *testing.T) {
+	engine, cleanup := setupSearchEnv(t, true)
+	defer cleanup()
+
+	type rerankPayload struct {
+		Query     string   `json:"query"`
+		Documents []string `json:"documents"`
+		Model     string   `json:"model"`
+		TopK      int      `json:"top_k"`
+	}
+	var captured rerankPayload
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/embeddings":
+			resp := map[string]any{
+				"data":  []map[string]any{{"embedding": make([]float64, 1024), "index": 0}},
+				"model": "voyage-4-lite",
+				"usage": map[string]int{"total_tokens": 3},
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+		case "/v1/rerank":
+			if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			data := make([]map[string]any, len(captured.Documents))
+			for i := range captured.Documents {
+				data[i] = map[string]any{"index": i, "relevance_score": 1.0 - float64(i)*0.01}
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"data":  data,
+				"model": captured.Model,
+				"usage": map[string]int{"total_tokens": 17},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	engine.Voyage = voyage.NewClientWithBaseURL("test-key", srv.URL)
+
+	const query = "database query audit sentinel"
+	result, err := engine.Search(context.Background(), query, SearchOptions{TopK: 3})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if !result.Reranked {
+		t.Fatal("Search result was not marked reranked")
+	}
+	if captured.Query != query {
+		t.Fatalf("rerank query = %q, want %q", captured.Query, query)
+	}
+	if captured.Model != voyage.ModelRerank25Lite {
+		t.Fatalf("rerank model = %q, want %q", captured.Model, voyage.ModelRerank25Lite)
+	}
+	if captured.TopK != 3 {
+		t.Fatalf("rerank top_k = %d, want 3", captured.TopK)
+	}
+	if len(captured.Documents) == 0 {
+		t.Fatal("rerank documents were empty")
+	}
+	if !strings.Contains(captured.Documents[0], `collection="test"`) {
+		t.Fatalf("rerank document is missing provenance: %q", captured.Documents[0])
+	}
+
+	var requests, tokens int
+	if err := engine.DB.QueryRow("SELECT COALESCE(SUM(request_count), 0), COALESCE(SUM(token_count), 0) FROM api_usage WHERE operation = 'rerank'").Scan(&requests, &tokens); err != nil {
+		t.Fatalf("query rerank usage: %v", err)
+	}
+	if requests != 1 || tokens != 17 {
+		t.Fatalf("rerank usage = requests:%d tokens:%d, want 1/17", requests, tokens)
+	}
+}
+
 func TestSearchHybrid(t *testing.T) {
 	engine, cleanup := setupSearchEnv(t, true)
 	defer cleanup()

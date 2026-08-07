@@ -63,11 +63,13 @@ See [Format reference](format.md) for the canonical schema.
 | `missing_sift_toml` | folder has files but no `sift.toml` |
 | `parse_error` | `sift.toml` exists but is malformed |
 | `stale` | file's freshness signature drifted since the entry |
-| `missing_summary` | entry exists but `summary == ""` |
+| `missing_summary` | entry exists but `summary == ""`; only checked with `--require-summaries` |
 | `orphaned` | entry refers to a file that no longer exists |
 | `schema_version` | `schema_version` is unsupported |
 
-`sift index check` exits with code `2` when any defects are found.
+`sift index check` exits with code `2` when any enabled defects are
+found. Empty summaries are valid in fully local mode; use `sift index
+check --require-summaries` only when summary coverage is your policy.
 
 ## Common workflows
 

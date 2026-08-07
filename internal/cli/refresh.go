@@ -243,6 +243,9 @@ func runRefreshOrchestrated(cmd *cobra.Command, files []string, flags *refreshFl
 	}
 	if cfg != nil && !cfg.Daemon.Enabled {
 		logger.Debug("daemon disabled via cfg.Daemon.Enabled=false, using in-process path")
+		if err := ensureDaemonStoppedForLocalMode(); err != nil {
+			return err
+		}
 		return runRefreshInProcess(cmd, files, flags, cfg)
 	}
 
@@ -436,7 +439,7 @@ func runRefreshInProcess(cmd *cobra.Command, args []string, flags *refreshFlags,
 	defer bleveIdx.Close()
 
 	var voyageClient *voyage.Client
-	if cfg.API.VoyageAPIKey != "" {
+	if voyage.HasAPIKey(cfg.API.VoyageAPIKey) {
 		voyageClient = voyage.NewClientWithTransport(cfg.API.VoyageAPIKey, "", voyage.TransportConfig{
 			MaxIdleConns:          cfg.Transport.MaxIdleConns,
 			MaxIdleConnsPerHost:   cfg.Transport.MaxIdleConnsPerHost,
@@ -569,6 +572,7 @@ func runRefreshInProcess(cmd *cobra.Command, args []string, flags *refreshFlags,
 				Concurrency:    flags.concurrency,
 				APIKey:         apiKey,
 				Model:          "",
+				Priority:       cfg.API.DeepInfraPriority,
 				Database:       database,
 				CollectionRoot: collRoot,
 				CollectionName: collection,

@@ -1,9 +1,9 @@
 # `sift index` Deep Dive
 
-**TL;DR.** `sift index` walks a tree, parses each `sift.toml`, and emits
-a structured table of contents. On a TTY it renders markdown; piped, it
-renders a JSON envelope. Use `sift index check` for lint-style defect
-reports.
+**TL;DR.** `sift index --orient` emits a compact semantic routing map
+for agents. It defaults to the selected root plus one level, prefers
+editorial summaries, and falls back locally to titles, verbatim prose,
+and headings. Plain `sift index` remains the detailed tree view.
 
 See the flag-table summary in [CLI Reference](../cli-reference.md#sift-index).
 
@@ -18,11 +18,28 @@ Auto-detection:
 
 Override with `--json` / `--markdown` (mutually exclusive).
 
+`--orient` always emits JSON, is incompatible with `--markdown`, and
+defaults to `--depth 1` unless depth is explicitly supplied.
+`--summaries=false` makes orientation ignore editorial fields and use
+only local extractive signals.
+
 `--sections` defaults to `on` when emitting JSON and `off` when emitting
 markdown — JSON consumers usually want the H1/H2 outline, terminal
 viewers usually do not.
 
 ## Filters
+
+When `--collection NAME` is present, the optional positional path is
+relative to that collection:
+
+```bash
+sift index --collection vault --orient
+sift index docs --collection vault --orient
+sift index docs/architecture --collection vault --orient
+```
+
+Returned paths stay collection-relative at every step, so they can be
+passed directly to `sift index`, `sift search --path`, or `sift read`.
 
 All filters compose AND-style and apply to both `sift index` (read view)
 and `sift index check`:
@@ -47,12 +64,20 @@ and lives at `internal/index/render_json.go`. Highlights:
 - `folders[]` — flat list, sorted by path, depth-stamped.
 - `errors[]` — non-fatal parse errors per folder.
 
+The compact orientation envelope intentionally omits hashes, mtimes,
+and section line ranges. Its folder entries contain `path`, `purpose`,
+`purpose_source`, `use_when`, `children`, and compact `files`. File
+entries contain `path`, `title`, `summary`, `summary_source`, `topics`,
+and `words`.
+
 ## When to use which subcommand
 
 | Goal | Command |
 |------|---------|
-| Read the tree (human or agent) | `sift index` |
-| Generate a digest for prompt context | `sift index --json | jq .digest` |
+| Quick semantic orientation | `sift index -c NAME --orient` |
+| Drill into a branch | `sift index PATH -c NAME --orient` |
+| Inspect detailed sections/metadata | `sift index PATH -c NAME --json` |
+| Read the selected leaf | `sift read FILE -c NAME --section HEADING` |
 | Spot missing/stale entries | `sift index check` |
 | Generate a PR-friendly checklist | `sift index check --markdown > REPORT.md` |
 | Programmatic CI gate | `sift index check --json --collection NAME` |
@@ -67,14 +92,15 @@ and lives at `internal/index/render_json.go`. Highlights:
 ## Examples
 
 ```bash
-# Top-level orientation
-sift index --collection vault --depth 1
+# Discover collections, then get top-level semantic orientation
+sift collections --json
+sift index --collection vault --orient
 
-# Pipe-friendly digest for an agent prompt
-sift index --collection vault --json --summaries=false | jq '.digest'
+# Drill into a subtree while keeping collection-relative paths
+sift index docs --collection vault --orient
 
 # Drill into a subtree, last 7 days only
-sift index docs --path 'docs/**' --since 7d
+sift index docs --collection vault --json --since 7d
 
 # PR-grade lint report
 sift index check ./docs --markdown > REPORT.md

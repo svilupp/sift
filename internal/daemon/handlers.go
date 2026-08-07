@@ -109,16 +109,17 @@ func (h *Handlers) writeError(w http.ResponseWriter, status int, code, message s
 // Health responds to GET /health with daemon liveness data.
 func (h *Handlers) Health(w http.ResponseWriter, _ *http.Request) {
 	resp := HealthResponse{
-		Ok:              true,
-		Version:         h.deps.Version,
-		UptimeS:         int64(time.Since(h.deps.StartedAt).Seconds()),
-		PID:             os.Getpid(),
-		RequestCount:    h.deps.RequestCount.Load(),
-		Goroutines:      runtime.NumGoroutine(),
-		StartedAt:       h.deps.StartedAt.UTC().Format(time.RFC3339),
-		SocketPath:      h.deps.SocketPath,
-		DaemonLogPath:   h.deps.DaemonLogPath,
-		IdleTimeoutSecs: int64(h.deps.IdleTimeout.Seconds()),
+		Ok:               true,
+		Version:          h.deps.Version,
+		UptimeS:          int64(time.Since(h.deps.StartedAt).Seconds()),
+		PID:              os.Getpid(),
+		RequestCount:     h.deps.RequestCount.Load(),
+		VoyageConfigured: h.deps.Voyage.Configured(),
+		Goroutines:       runtime.NumGoroutine(),
+		StartedAt:        h.deps.StartedAt.UTC().Format(time.RFC3339),
+		SocketPath:       h.deps.SocketPath,
+		DaemonLogPath:    h.deps.DaemonLogPath,
+		IdleTimeoutSecs:  int64(h.deps.IdleTimeout.Seconds()),
 	}
 	if h.deps.InFlight != nil {
 		resp.InFlight = h.deps.InFlight.Load()
@@ -315,7 +316,7 @@ func (h *Handlers) Refresh(w http.ResponseWriter, r *http.Request) {
 	// Pass nil voyage when no API key is configured so sync.Refresh
 	// takes the BM25-only path, mirroring cli/refresh.go's behaviour.
 	voy := h.deps.Voyage
-	if cfg.API.VoyageAPIKey == "" {
+	if !voy.Configured() {
 		voy = nil
 	}
 

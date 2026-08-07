@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"sift/internal/anchor"
+	"sift/internal/chunk"
 )
 
 // SectionMaxBytes caps the size of a file we will read for live section
@@ -55,6 +56,14 @@ func AttachSections(ctx context.Context, fm *FolderMap) {
 				continue
 			}
 			lines := strings.Split(string(data), "\n")
+			file.Title = chunk.ExtractTitle(lines)
+			if file.Title == "" {
+				file.Title = titleFromFilename(file.Name)
+			}
+			if file.Words == 0 {
+				file.Words = len(strings.Fields(string(data)))
+			}
+			file.Excerpt = extractExcerpt(lines)
 			parsed := anchor.ParseSections(file.Path, lines)
 			if len(parsed) == 0 {
 				// Empty (not nil) communicates "we tried, found none".
@@ -81,4 +90,44 @@ func AttachSections(ctx context.Context, fm *FolderMap) {
 			file.Sections = out
 		}
 	}
+}
+
+func titleFromFilename(name string) string {
+	base := strings.TrimSuffix(filepath.Base(name), filepath.Ext(name))
+	base = strings.NewReplacer("-", " ", "_", " ").Replace(base)
+	return strings.TrimSpace(base)
+}
+
+// extractExcerpt returns a short verbatim prose paragraph. It is deliberately
+// extractive: local-only orientation should add context without inventing it.
+func extractExcerpt(lines []string) string {
+	start := 0
+	if fm := chunk.ParseFrontmatter(lines); fm != nil {
+		start = fm.EndLine
+	}
+	var parts []string
+	inFence := false
+	for _, raw := range lines[start:] {
+		line := strings.TrimSpace(raw)
+		if strings.HasPrefix(line, "```") || strings.HasPrefix(line, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+		if line == "" {
+			if len(parts) > 0 {
+				break
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "#") || strings.HasPrefix(line, "|") ||
+			strings.HasPrefix(line, "<!--") || strings.HasPrefix(line, "[![") ||
+			strings.HasPrefix(line, "![") {
+			continue
+		}
+		parts = append(parts, line)
+	}
+	return truncate(strings.Join(parts, " "), 280)
 }

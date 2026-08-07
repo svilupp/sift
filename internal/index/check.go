@@ -37,6 +37,11 @@ type CheckOptions struct {
 	// does not produce a sea of false orphan defects. Files explicitly
 	// listed in `sift.toml` are always checked regardless of this flag.
 	IncludeAll bool
+
+	// RequireSummary makes an empty per-file summary a lint defect. It is
+	// opt-in because mechanical, fully local indexes intentionally leave the
+	// editorial summary field empty.
+	RequireSummary bool
 }
 
 // Defect categories. Stable strings; both human and JSON output use them.
@@ -403,7 +408,7 @@ func checkFiles(folderAbs, folderRel string, orphanCandidateNames, allDiskNames 
 					})
 					report.Summary.Stale++
 				}
-				if entry.Summary == "" {
+				if opts.RequireSummary && entry.Summary == "" {
 					fc.MissingSummary = append(fc.MissingSummary, name)
 					report.Defects = append(report.Defects, Defect{
 						Kind:   DefectMissingSummary,
@@ -437,7 +442,7 @@ func checkFiles(folderAbs, folderRel string, orphanCandidateNames, allDiskNames 
 			report.Summary.Stale++
 		}
 
-		if entry.Summary == "" {
+		if opts.RequireSummary && entry.Summary == "" {
 			fc.MissingSummary = append(fc.MissingSummary, name)
 			report.Defects = append(report.Defects, Defect{
 				Kind:   DefectMissingSummary,

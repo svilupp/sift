@@ -10,8 +10,8 @@
 //     Voyage client. We do NOT inject a stub engine because that would
 //     require a non-trivial production-code change. Instead, every test
 //     that touches /search uses an empty database (so BM25 returns no
-//     hits) and an empty Voyage API key (so vector search fails — which is
-//     non-fatal per search/search.go:347-358 and falls back to BM25-only).
+//     hits) and an empty Voyage API key (so the daemon constructs no Voyage
+//     client and search stays BM25-only without upstream calls).
 //     Net effect: /search returns 200 with zero results, which is exactly
 //     the shape these tests assert.
 //

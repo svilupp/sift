@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -17,6 +18,7 @@ import (
 )
 
 func newCollectionsCmd() *cobra.Command {
+	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "collections",
 		Short: "Manage collections",
@@ -27,8 +29,11 @@ Workflow:
   sift collections add notes ~/notes/   # register a folder
   sift refresh                           # index its files
   sift search "my query"                 # search across all collections`,
-		RunE: runCollectionsList,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runCollectionsList(cmd, jsonOut)
+		},
 	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit machine-readable JSON")
 
 	cmd.AddCommand(
 		newCollectionsAddCmd(),
@@ -165,7 +170,14 @@ func newCollectionsRemoveCmd() *cobra.Command {
 	return cmd
 }
 
-func runCollectionsList(cmd *cobra.Command, args []string) error {
+type collectionListEntry struct {
+	Name      string   `json:"name"`
+	Path      string   `json:"path"`
+	FileCount int      `json:"file_count"`
+	Tags      []string `json:"tags"`
+}
+
+func runCollectionsList(cmd *cobra.Command, jsonOut bool) error {
 	database, err := openDB()
 	if err != nil {
 		return err
@@ -175,6 +187,27 @@ func runCollectionsList(cmd *cobra.Command, args []string) error {
 	cols, err := database.ListCollections()
 	if err != nil {
 		return err
+	}
+
+	if jsonOut {
+		entries := make([]collectionListEntry, 0, len(cols))
+		for _, col := range cols {
+			fileCount, countErr := database.CollectionFileCount(col.ID)
+			if countErr != nil {
+				fileCount = -1
+			}
+			tags := make([]string, 0, len(col.Tags))
+			tags = append(tags, col.Tags...)
+			entries = append(entries, collectionListEntry{
+				Name:      col.Name,
+				Path:      col.Path,
+				FileCount: fileCount,
+				Tags:      tags,
+			})
+		}
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		enc.SetIndent("", "  ")
+		return enc.Encode(map[string]any{"collections": entries})
 	}
 
 	if len(cols) == 0 {

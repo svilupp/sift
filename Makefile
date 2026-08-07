@@ -49,9 +49,33 @@ lint:
 	@test -x "$(GOLANGCI_LINT)" || { echo "golangci-lint not found. Run 'make setup' first."; exit 1; }
 	$(GOLANGCI_LINT) run
 
-# Run all checks (vet + lint + test)
-check: vet lint test
-	@echo "All checks passed!"
+# Each check: run quietly, capture combined output to a temp file. On success
+# print "<name>: OK". On failure, dump the captured output and exit non-zero.
+# $(call run_check,<label>,<shell command>)
+define run_check
+	@out=$$(mktemp); \
+	if $(2) >$$out 2>&1; then \
+		echo "$(1): OK"; \
+		rm -f $$out; \
+	else \
+		echo "$(1): FAIL"; \
+		echo "------------------------------------------------------------"; \
+		cat $$out; \
+		echo "------------------------------------------------------------"; \
+		rm -f $$out; \
+		exit 1; \
+	fi
+endef
+
+# Run all checks (fmt + vet + lint + test + build)
+check:
+	@echo "Running sift checks..."
+	$(call run_check,fmt,! gofmt -l . 2>&1 | grep .)
+	$(call run_check,vet,go vet ./...)
+	$(call run_check,lint,$(GOLANGCI_LINT) run)
+	$(call run_check,test,go test -race ./...)
+	$(call run_check,build,go build -ldflags "$(LDFLAGS)" -o /dev/null ./cmd/sift)
+	@echo "All checks passed."
 
 # Install development tools
 setup:

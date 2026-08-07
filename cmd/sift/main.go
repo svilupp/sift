@@ -22,7 +22,7 @@ const daemonLogSizeWarnBytes = 100 * 1024 * 1024
 
 // Build-time variables set via ldflags.
 var (
-	version   = "0.5.0"
+	version   = "0.6.0"
 	commit    = "unknown"
 	buildTime = "unknown"
 )
@@ -78,6 +78,10 @@ func runDaemon() {
 	if err != nil {
 		logger.Error("load config", slog.Any("err", err))
 		os.Exit(1)
+	}
+	if !cfg.Daemon.Enabled {
+		logger.Info("daemon disabled in config; exiting")
+		return
 	}
 
 	if err := daemon.Serve(ctx, cfg); err != nil {

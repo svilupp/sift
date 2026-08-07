@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"sift/internal/config"
 	"sift/internal/daemon"
 )
 
@@ -243,6 +244,47 @@ func TestDaemonStartStop(t *testing.T) {
 	stdout, _, code := runDaemonCmd(t, "stop", "--timeout", "1s")
 	if code != 0 {
 		t.Errorf("stop exit code = %d, want 0; stdout=%q", code, stdout)
+	}
+}
+
+func TestDaemonEnabledConfigCanKeepDaemonOff(t *testing.T) {
+	siftDir := daemonTestEnv(t)
+	cfg := config.Default()
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("save config: %v", err)
+	}
+
+	cmd := NewRootCmd("test")
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+	cmd.SetErr(&output)
+	cmd.SetArgs([]string{"config", "set", "daemon.enabled", "false"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("config set daemon.enabled false: %v", err)
+	}
+
+	loaded, err := config.Load()
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if loaded.Daemon.Enabled {
+		t.Fatal("daemon.enabled remained true")
+	}
+
+	flagPath := filepath.Join(siftDir, "spawn.flag")
+	scriptPath := filepath.Join(siftDir, "fake-daemon.sh")
+	writeFakeDaemon(t, scriptPath, flagPath, 0)
+	t.Setenv("SIFT_DAEMON_BINARY", scriptPath)
+
+	_, stderr, code := runDaemonCmd(t, "start")
+	if code != 1 {
+		t.Fatalf("daemon start exit code = %d, want 1", code)
+	}
+	if !strings.Contains(stderr, "daemon is disabled") {
+		t.Fatalf("daemon start error = %q, want disabled guidance", stderr)
+	}
+	if _, err := os.Stat(flagPath); !os.IsNotExist(err) {
+		t.Fatalf("disabled daemon was spawned; stat error = %v", err)
 	}
 }
 

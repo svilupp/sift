@@ -28,6 +28,10 @@ func TestAttachSections_BasicMarkdown(t *testing.T) {
 	if got[1].Heading != "Sub" || got[1].Level != 2 {
 		t.Fatalf("unexpected second section: %+v", got[1])
 	}
+	file := fm.Folders[0].Files[0]
+	if file.Title != "Title" || file.Excerpt != "intro" || file.Words == 0 {
+		t.Fatalf("local semantic metadata missing: %+v", file)
+	}
 }
 
 func TestAttachSections_NonText(t *testing.T) {

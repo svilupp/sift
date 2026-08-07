@@ -146,7 +146,7 @@ Results are written to a JSON file and a summary is printed to stdout.`,
 
 			// 9. Create Voyage client if hybrid mode.
 			var voyageClient *voyage.Client
-			if hybrid && cfg.API.VoyageAPIKey != "" {
+			if hybrid && voyage.HasAPIKey(cfg.API.VoyageAPIKey) {
 				voyageClient = voyage.NewClient(cfg.API.VoyageAPIKey)
 			}
 

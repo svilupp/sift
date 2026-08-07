@@ -98,9 +98,10 @@ func newSearchCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "search <query>",
-		Short: "Search across collections",
-		Long: `Hybrid search combining BM25, vector embeddings, and reranking.
+		Use:   "search <query words...>",
+		Short: "Search collections or individual files",
+		Long: `Search always uses the local BM25 index. When an API key is configured,
+Sift also uses vector embeddings and reranking; without a key it remains BM25-only.
 
 Results are labeled a-z. Use these labels with "sift feedback" to improve
 future rankings. The search_id in the output header identifies the session.
@@ -133,6 +134,7 @@ File search (--file):
 
 Examples:
   sift search "concurrent write limitation"
+  sift search concurrent write limitation        # quoting is optional
   sift search "How does the agent handle rate limiting?" --collection vault
   sift search "authentication flow" --since 2w --top-k 5
   sift search "API design" --path "*/topics/work/*"
@@ -152,7 +154,7 @@ Multi-keyword natural-language queries are the intended usage pattern.`,
 			if len(args) == 0 {
 				return cmd.Help()
 			}
-			query := args[0]
+			query := strings.Join(args, " ")
 			start := time.Now()
 
 			if compact {
@@ -313,6 +315,9 @@ func runSearchOrchestrated(cmd *cobra.Command, f *searchFlags) error {
 	// User opt-out via config: silent, no fallback warning.
 	if cfg != nil && !cfg.Daemon.Enabled {
 		logger.Debug("daemon disabled via cfg.Daemon.Enabled=false, using in-process path")
+		if err := ensureDaemonStoppedForLocalMode(); err != nil {
+			return err
+		}
 		return runSearchInProcessFn(cmd, f)
 	}
 
@@ -449,7 +454,7 @@ func searchViaDaemon(cmd *cobra.Command, f *searchFlags, client *daemon.Client) 
 
 	if f.agent {
 		renderAgentResults(w, f.query, resp.SearchID, results, elapsed,
-			"", f.readCommand, f.noTips, f.compact)
+			"", f.readCommand, f.collection, f.noTips, f.compact)
 		return nil
 	}
 
@@ -808,7 +813,7 @@ func runSearchInProcess(cmd *cobra.Command, f *searchFlags) error {
 
 	// Create Voyage client if API key is set.
 	var voyageClient *voyage.Client
-	if cfg.API.VoyageAPIKey != "" {
+	if voyage.HasAPIKey(cfg.API.VoyageAPIKey) {
 		voyageClient = voyage.NewClientWithTransport(cfg.API.VoyageAPIKey, "", voyage.TransportConfig{
 			MaxIdleConns:          cfg.Transport.MaxIdleConns,
 			MaxIdleConnsPerHost:   cfg.Transport.MaxIdleConnsPerHost,
@@ -1066,7 +1071,7 @@ func runSearchInProcess(cmd *cobra.Command, f *searchFlags) error {
 	}
 
 	if agent {
-		renderAgentResults(w, query, searchID, results, elapsed, cfg.Agent.Hint, readCommand, noTips, compact)
+		renderAgentResults(w, query, searchID, results, elapsed, cfg.Agent.Hint, readCommand, collection, noTips, compact)
 		return nil
 	}
 
@@ -1284,13 +1289,13 @@ func buildNoResultsTip(result *search.SearchResult, threshold float64) string {
 	return "Try different keywords or check sift refresh."
 }
 
-func renderAgentResults(w io.Writer, query, searchID string, results []searchResult, elapsed time.Duration, customHint string, readCommand string, noTips bool, compact bool) {
+func renderAgentResults(w io.Writer, query, searchID string, results []searchResult, elapsed time.Duration, customHint string, readCommand string, collection string, noTips bool, compact bool) {
 	fmt.Fprintf(w, "Search: %q | id:%s | %d results | %dms\n", query, searchID, len(results), elapsed.Milliseconds())
 	fmt.Fprintln(w)
 
 	if len(results) == 0 {
 		if !noTips {
-			fmt.Fprintln(w, agentHint(customHint, readCommand))
+			fmt.Fprintln(w, agentHint(customHint, readCommand, collection))
 		}
 		return
 	}
@@ -1322,7 +1327,7 @@ func renderAgentResults(w io.Writer, query, searchID string, results []searchRes
 	}
 
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, agentHint(customHint, readCommand))
+	fmt.Fprintln(w, agentHint(customHint, readCommand, collection))
 	if !compact {
 		fmt.Fprintf(w, "Feedback: sift feedback %s --positive a,b --negative c\n", searchID)
 	}
@@ -1424,12 +1429,15 @@ func agentCharCount(result searchResult) int {
 	return 0
 }
 
-func agentHint(customHint string, readCommand string) string {
+func agentHint(customHint string, readCommand string, collection string) string {
 	if strings.TrimSpace(customHint) != "" {
 		return customHint
 	}
 	if strings.TrimSpace(readCommand) == "" {
-		return `HINT: Read a file or section from the results above with your preferred reader command.`
+		if strings.TrimSpace(collection) == "" {
+			return `HINT: Scope search with --collection NAME, then use sift read <file> --collection NAME --section "<section>".`
+		}
+		return fmt.Sprintf(`HINT: sift read <file> --collection %q --section "<section>" to read a result.`, collection)
 	}
 	return fmt.Sprintf(`HINT: %s <file> --section "<section>" to read a section.`, strings.TrimSpace(readCommand))
 }

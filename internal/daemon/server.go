@@ -131,36 +131,14 @@ func Serve(ctx context.Context, cfg *config.Config) error {
 		}
 	}()
 
-	// 6) Construct Voyage client and warm TLS.
-	voyageClient := voyage.NewClientWithTransport(cfg.API.VoyageAPIKey, "", voyage.TransportConfig{
-		MaxIdleConns:          cfg.Transport.MaxIdleConns,
-		MaxIdleConnsPerHost:   cfg.Transport.MaxIdleConnsPerHost,
-		MaxConnsPerHost:       cfg.Transport.MaxConnsPerHost,
-		IdleConnTimeout:       cfg.Transport.IdleConnTimeout.D(),
-		TLSHandshakeTimeout:   cfg.Transport.TLSHandshakeTimeout.D(),
-		ResponseHeaderTimeout: cfg.Transport.ResponseHeaderTimeout.D(),
-	})
-	if cfg.Embedding.Model != "" {
-		voyageClient.EmbedModel = cfg.Embedding.Model
-	}
-	if cfg.Embedding.Dimensions > 0 {
-		voyageClient.EmbedDimensions = cfg.Embedding.Dimensions
-	}
-	if cfg.Embedding.OutputDtype != "" {
-		voyageClient.EmbedDtype = cfg.Embedding.OutputDtype
-	}
-	if cfg.Reranking.Model != "" {
-		voyageClient.RerankModel = cfg.Reranking.Model
-	}
-	if cfg.API.RequestTimeoutSecs > 0 {
-		voyageClient.SetTimeout(time.Duration(cfg.API.RequestTimeoutSecs) * time.Second)
-	}
+	// 6) Construct Voyage client only when an API key is configured. A nil
+	// client is the invariant for fully local BM25-only operation.
+	voyageClient := newVoyageClient(cfg)
 
-	// Preconnect: only meaningful when an API key is configured. Skip
-	// entirely when the key is empty so we don't dial real Voyage from
-	// tests or unconfigured installs.
+	// An unconfigured daemon never creates a Voyage transport, dials Voyage,
+	// or enables vector/rerank work.
 	var preconnectWG sync.WaitGroup
-	if cfg.API.VoyageAPIKey != "" {
+	if voyageClient != nil {
 		preconnectWG.Add(1)
 		go func() {
 			defer preconnectWG.Done()
@@ -338,6 +316,40 @@ func Serve(ctx context.Context, cfg *config.Config) error {
 	}
 	logger.Info("daemon exited cleanly")
 	return nil
+}
+
+// newVoyageClient returns nil for an unconfigured install. Keeping this
+// decision at the daemon composition root prevents an empty-key client from
+// accidentally enabling vector search, reranking, or refresh embeddings.
+func newVoyageClient(cfg *config.Config) *voyage.Client {
+	if cfg == nil || !voyage.HasAPIKey(cfg.API.VoyageAPIKey) {
+		return nil
+	}
+
+	client := voyage.NewClientWithTransport(cfg.API.VoyageAPIKey, "", voyage.TransportConfig{
+		MaxIdleConns:          cfg.Transport.MaxIdleConns,
+		MaxIdleConnsPerHost:   cfg.Transport.MaxIdleConnsPerHost,
+		MaxConnsPerHost:       cfg.Transport.MaxConnsPerHost,
+		IdleConnTimeout:       cfg.Transport.IdleConnTimeout.D(),
+		TLSHandshakeTimeout:   cfg.Transport.TLSHandshakeTimeout.D(),
+		ResponseHeaderTimeout: cfg.Transport.ResponseHeaderTimeout.D(),
+	})
+	if cfg.Embedding.Model != "" {
+		client.EmbedModel = cfg.Embedding.Model
+	}
+	if cfg.Embedding.Dimensions > 0 {
+		client.EmbedDimensions = cfg.Embedding.Dimensions
+	}
+	if cfg.Embedding.OutputDtype != "" {
+		client.EmbedDtype = cfg.Embedding.OutputDtype
+	}
+	if cfg.Reranking.Model != "" {
+		client.RerankModel = cfg.Reranking.Model
+	}
+	if cfg.API.RequestTimeoutSecs > 0 {
+		client.SetTimeout(time.Duration(cfg.API.RequestTimeoutSecs) * time.Second)
+	}
+	return client
 }
 
 // wrapWithRequestCount increments the shared counter on every request

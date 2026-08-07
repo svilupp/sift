@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +15,7 @@ import (
 	"sift/internal/bm25"
 	"sift/internal/chunk"
 	"sift/internal/db"
+	"sift/internal/voyage"
 )
 
 // testEnv holds shared infrastructure for refresh tests.
@@ -164,6 +167,42 @@ func TestRefreshNewFiles(t *testing.T) {
 	// Verify Bleve doc count matches chunk count.
 	if got := bleveDocCount(t, env.Bleve); got != uint64(stats.ChunksTotal) {
 		t.Errorf("Bleve DocCount = %d, want %d", got, stats.ChunksTotal)
+	}
+}
+
+func TestRefreshTreatsEmptyKeyClientAsBM25Only(t *testing.T) {
+	env := setupEnv(t)
+	colDir := t.TempDir()
+	writeMD(t, colDir, "local.md", 12)
+	addCollection(t, env.DB, "local", colDir)
+
+	requests := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	client := voyage.NewClientWithBaseURL("", srv.URL)
+	var buf bytes.Buffer
+	stats, err := Refresh(context.Background(), env.DB, env.Bleve, client, RefreshOptions{
+		ChunkOpts: env.ChunkOpt,
+	}, &buf)
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	if stats.ChunksEmbedded != 0 || stats.EmbedErrors != 0 {
+		t.Fatalf("embedding stats = embedded:%d errors:%d, want 0/0", stats.ChunksEmbedded, stats.EmbedErrors)
+	}
+	if requests != 0 {
+		t.Fatalf("empty-key refresh sent %d HTTP request(s), want 0", requests)
+	}
+	deadLetters, err := env.DB.GetUnresolvedDeadLetters()
+	if err != nil {
+		t.Fatalf("GetUnresolvedDeadLetters: %v", err)
+	}
+	if len(deadLetters) != 0 {
+		t.Fatalf("empty-key refresh created %d dead letter(s), want 0", len(deadLetters))
 	}
 }
 
@@ -422,6 +461,62 @@ func TestRefreshCollectionFilter(t *testing.T) {
 	}
 	if len(betaFiles) != 0 {
 		t.Errorf("beta DB files = %d, want 0 (beta was not refreshed)", len(betaFiles))
+	}
+}
+
+func TestRefreshMissingCollectionPathSkipped(t *testing.T) {
+	env := setupEnv(t)
+
+	dir1 := t.TempDir()
+	missingDir := filepath.Join(t.TempDir(), "gone")
+
+	writeMD(t, dir1, "file1.md", 20)
+
+	addCollection(t, env.DB, "alpha", dir1)
+	addCollection(t, env.DB, "ghost", missingDir)
+
+	var buf bytes.Buffer
+	stats, err := Refresh(context.Background(), env.DB, env.Bleve, nil, RefreshOptions{
+		ChunkOpts: env.ChunkOpt,
+	}, &buf)
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "collection path missing, skipping: "+missingDir) {
+		t.Errorf("expected missing-path warning in output, got: %s", buf.String())
+	}
+
+	if stats.FilesScanned != 1 {
+		t.Errorf("FilesScanned = %d, want 1 (only alpha's file)", stats.FilesScanned)
+	}
+
+	colAlpha, err := env.DB.GetCollection("alpha")
+	if err != nil {
+		t.Fatalf("GetCollection alpha: %v", err)
+	}
+	alphaFiles, err := env.DB.GetFilesByCollection(colAlpha.ID)
+	if err != nil {
+		t.Fatalf("GetFilesByCollection alpha: %v", err)
+	}
+	if len(alphaFiles) != 1 {
+		t.Errorf("alpha DB files = %d, want 1", len(alphaFiles))
+	}
+}
+
+func TestRefreshMissingCollectionPathExplicitErrors(t *testing.T) {
+	env := setupEnv(t)
+
+	missingDir := filepath.Join(t.TempDir(), "gone")
+	addCollection(t, env.DB, "ghost", missingDir)
+
+	var buf bytes.Buffer
+	_, err := Refresh(context.Background(), env.DB, env.Bleve, nil, RefreshOptions{
+		CollectionName: "ghost",
+		ChunkOpts:      env.ChunkOpt,
+	}, &buf)
+	if err == nil {
+		t.Fatal("expected error refreshing explicit missing collection, got nil")
 	}
 }
 

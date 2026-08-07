@@ -20,9 +20,8 @@ import (
 // DefaultBaseURL is the OpenAI-compat DeepInfra endpoint.
 const DefaultBaseURL = "https://api.deepinfra.com"
 
-// DefaultModel is the LT-A winner. Keep `deepseek-ai/DeepSeek-V4-Flash`
-// as the production default — strict-mode JSON output works cleanly.
-const DefaultModel = "deepseek-ai/DeepSeek-V4-Flash"
+// DefaultModel is DeepSeek V4 Flash's official release on DeepInfra.
+const DefaultModel = "deepseek-ai/DeepSeek-V4-Flash-0731"
 
 // DefaultTimeout is the per-call HTTP timeout (PROPOSAL2 §"Concurrency").
 const DefaultTimeout = 180 * time.Second
@@ -38,16 +37,26 @@ const (
 // Index = attempt-1 (after attempt 1 failed → sleep[0] before attempt 2).
 var retrySchedule = []time.Duration{initialBackoff, secondBackoff, thirdBackoff}
 
-// USDPerInToken / USDPerOutToken: DeepInfra DeepSeek V4 pricing,
-// $0.14 / 1M input, $0.28 / 1M output.
+// USDPerInToken / USDPerOutToken: DeepInfra DeepSeek V4 Flash 0731
+// standard-tier pricing, $0.09 / 1M input and $0.18 / 1M output.
 const (
-	USDPerInToken  = 0.14 / 1_000_000.0
-	USDPerOutToken = 0.28 / 1_000_000.0
+	USDPerInToken           = 0.09 / 1_000_000.0
+	USDPerOutToken          = 0.18 / 1_000_000.0
+	PriorityPriceMultiplier = 1.5
 )
 
 // CostUSD estimates the dollar cost from token counts.
 func CostUSD(tokensIn, tokensOut int) float64 {
 	return float64(tokensIn)*USDPerInToken + float64(tokensOut)*USDPerOutToken
+}
+
+// CostUSDForTier estimates cost for the configured DeepInfra service tier.
+func CostUSDForTier(tokensIn, tokensOut int, priority bool) float64 {
+	cost := CostUSD(tokensIn, tokensOut)
+	if priority {
+		return cost * PriorityPriceMultiplier
+	}
+	return cost
 }
 
 // TransportConfig mirrors voyage.TransportConfig so callers can share
@@ -77,6 +86,7 @@ type Client struct {
 	model      string
 	httpClient *http.Client
 	logger     *slog.Logger
+	priority   bool
 
 	// strictDisabled is set when a 400 from strict-mode pushed us back
 	// to instruction mode; subsequent calls skip response_format.
@@ -143,6 +153,10 @@ func newTransport(tc TransportConfig) *http.Transport {
 // SetModel overrides the chat-completions model.
 func (c *Client) SetModel(m string) { c.model = m }
 
+// SetPriority enables DeepInfra's priority service tier. When disabled,
+// service_tier is omitted so DeepInfra uses its standard default tier.
+func (c *Client) SetPriority(enabled bool) { c.priority = enabled }
+
 // SetTimeout updates the underlying HTTP client timeout.
 func (c *Client) SetTimeout(d time.Duration) { c.httpClient.Timeout = d }
 
@@ -156,6 +170,7 @@ type chatRequest struct {
 	Temperature    float64        `json:"temperature,omitempty"`
 	ResponseFormat map[string]any `json:"response_format,omitempty"`
 	MaxTokens      int            `json:"max_tokens,omitempty"`
+	ServiceTier    string         `json:"service_tier,omitempty"`
 }
 
 type chatMessage struct {
@@ -221,6 +236,9 @@ func (c *Client) Call(ctx context.Context, req CallRequest) (*CallResponse, erro
 			{Role: "user", Content: req.User},
 		},
 	}
+	if c.priority {
+		body.ServiceTier = "priority"
+	}
 	useStrict := req.Strict && !c.strictDisabled
 	if useStrict {
 		body.ResponseFormat = FolderResponseFormat()
@@ -261,6 +279,7 @@ func (c *Client) Call(ctx context.Context, req CallRequest) (*CallResponse, erro
 	stats.TokensIn = parsed.Usage.PromptTokens
 	stats.TokensOut = parsed.Usage.CompletionTokens
 	stats.CachedTokens = parsed.Usage.CachedTokens
+	stats.CostUSD = CostUSDForTier(stats.TokensIn, stats.TokensOut, c.priority)
 
 	return &CallResponse{
 		Content:    parsed.Choices[0].Message.Content,

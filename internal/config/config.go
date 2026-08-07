@@ -64,6 +64,7 @@ type TransportConfig struct {
 type APIConfig struct {
 	VoyageAPIKey       string `toml:"voyage_api_key"`
 	DeepInfraAPIKey    string `toml:"deepinfra_api_key"`
+	DeepInfraPriority  bool   `toml:"deepinfra_priority"`
 	RequestTimeoutSecs int    `toml:"request_timeout_seconds"`
 }
 

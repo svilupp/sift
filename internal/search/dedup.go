@@ -1,8 +1,9 @@
 package search
 
 import (
-	"github.com/cespare/xxhash/v2"
 	"sift/internal/fileutil"
+
+	"github.com/cespare/xxhash/v2"
 )
 
 // DuplicateRef tracks a duplicate chunk that was folded into the primary result.

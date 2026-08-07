@@ -46,6 +46,16 @@ func TestClientCallOK(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer test-key" {
 			t.Errorf("auth header: %q", got)
 		}
+		var req chatRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if req.Model != DefaultModel {
+			t.Errorf("model=%q want %q", req.Model, DefaultModel)
+		}
+		if req.ServiceTier != "" {
+			t.Errorf("service_tier=%q want omitted", req.ServiceTier)
+		}
 		writeJSON(w, 200, okBody(`{"purpose":"P","files":[{"path":"a","summary":"s"}]}`))
 	})
 
@@ -63,6 +73,24 @@ func TestClientCallOK(t *testing.T) {
 	}
 	if atomic.LoadInt32(&hits) != 1 {
 		t.Errorf("expected 1 hit, got %d", hits)
+	}
+}
+
+func TestClientCallPriorityServiceTier(t *testing.T) {
+	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var req chatRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if req.ServiceTier != "priority" {
+			t.Errorf("service_tier=%q want priority", req.ServiceTier)
+		}
+		writeJSON(w, 200, okBody(`{"purpose":"P","files":[]}`))
+	})
+	c.SetPriority(true)
+
+	if _, err := c.Call(context.Background(), CallRequest{System: "s", User: "u"}); err != nil {
+		t.Fatalf("Call: %v", err)
 	}
 }
 
@@ -259,9 +287,16 @@ func TestLoadAPIKeyWithFallback(t *testing.T) {
 }
 
 func TestCostUSD(t *testing.T) {
-	// 1M in tokens = $0.14, 1M out = $0.28.
+	// 1M in tokens = $0.09, 1M out = $0.18.
 	c := CostUSD(1_000_000, 1_000_000)
-	if c < 0.41 || c > 0.43 {
-		t.Errorf("cost=%.4f expected ~0.42", c)
+	if c < 0.26 || c > 0.28 {
+		t.Errorf("cost=%.4f expected ~0.27", c)
+	}
+}
+
+func TestCostUSDForPriorityTier(t *testing.T) {
+	c := CostUSDForTier(1_000_000, 1_000_000, true)
+	if c < 0.40 || c > 0.41 {
+		t.Errorf("cost=%.4f expected ~0.405", c)
 	}
 }

@@ -9,6 +9,13 @@ Keep it brief!
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-01
+
+- Sift now runs cleanly without AI keys: BM25-only search stays local, the daemon can be disabled persistently, and health output clearly reports local-only mode.
+- Add an agent-first navigation contract: compact semantic `sift index --orient` output with local extractive fallbacks, collection-relative drill-down, JSON collection discovery, `sift read`, and reliable unquoted multi-word search.
+- Fix `sift refresh` aborting the whole run when a registered collection's root directory no longer exists on disk; now warns and skips that collection, continuing with the rest.
+- Upgrade optional AI folder summaries to DeepInfra's `DeepSeek-V4-Flash-0731` model, with opt-in priority processing.
+
 ## [0.5.0] - 2026-05-09
 
 - Add committed per-folder indexes (`sift.toml`) that carry `purpose`, `use_when`, and per-file summaries. `sift refresh` maintains them automatically; inspect a tree with `sift index [path]`. Search results decorate hits with their enclosing folder's context (toggle via `--with-index` / `--no-index`).

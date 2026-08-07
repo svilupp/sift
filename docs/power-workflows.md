@@ -196,12 +196,13 @@ DEEPINFRA_API_KEY=$KEY \
 # 4. Watch progress (the detached run streams to ~/.sift/refresh-index.log).
 sift refresh --status
 
-# 5. Inspect the result.
-sift index -c vault | head -30
+# 5. Inspect the result (works even if step 3 was skipped).
+sift index -c vault --orient
 ```
 
-Expected output: `sift index -c vault | head` shows a markdown tree
-with one-line folder purposes and per-file summaries.
+Expected output: compact JSON with a semantic digest, direct children,
+and per-file titles/summaries. Without generated fields it uses local
+extractive prose and headings.
 
 ## Hand-edit a `sift.toml` Purpose
 
@@ -237,21 +238,22 @@ limited to the editorial fields you touched.
 
 ## Use `sift.toml` From an AI Agent
 
-Three-step orient → drill → search pattern. Pipe everything through
-`--json` so `--with-index` decoration is reliable.
+Four-step discover → orient → search → read pattern.
 
 ```bash
-# 1. Orient: digest + top-level folders.
-sift index -c vault --json --depth 1 \
-  | jq '{digest, folders: .folders[0:5] | map({path, purpose})}'
+# 0. Discover available collections.
+sift collections --json
 
-# 2. Drill into the most promising folder.
-sift index docs/agent-next-architecture -c vault --json \
-  | jq '.folders[0].files | map({path, summary})'
+# 1. Orient at depth 1, then drill into the most promising folder.
+sift index -c vault --orient
+sift index docs/agent-next-architecture -c vault --orient
 
-# 3. Search with folder context attached.
-sift search "tool routing policy" -c vault --json \
-  | jq '.results[] | {path, lines: "\(.start_line)-\(.end_line)", folder: .folder_index.folder_path, purpose: .folder_index.folder_purpose}'
+# 2. Search the selected branch with folder context attached.
+sift search tool routing policy -c vault --path 'docs/agent-next-architecture/**' --json \
+  | jq '.results[] | {file, lines: "\(.start_line)-\(.end_line)", folder: .folder_index.folder_path, purpose: .folder_index.folder_purpose}'
+
+# 3. Read the useful leaf or section.
+sift read docs/agent-next-architecture/tools.md -c vault --section routing-policy
 ```
 
 Expected output: each step yields a small JSON shape suitable for
@@ -302,4 +304,5 @@ sift refresh --status
 ```
 
 Expected output: `dead_letters` shrinks to zero after the retry; a
-follow-up `sift index check` reports `0 missing_summary` defects.
+follow-up `sift index check --require-summaries` reports `0
+missing_summary` defects.

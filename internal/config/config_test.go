@@ -144,6 +144,7 @@ func TestDefault(t *testing.T) {
 
 	t.Run("API", func(t *testing.T) {
 		assertEqual(t, cfg.API.VoyageAPIKey, "")
+		assertEqual(t, cfg.API.DeepInfraPriority, false)
 		assertEqual(t, cfg.API.RequestTimeoutSecs, 60)
 	})
 
@@ -236,6 +237,7 @@ model = "voyage-4-lite"
 	}
 
 	want := Default()
+	assertEqual(t, loaded.API.DeepInfraPriority, false)
 	assertEqual(t, loaded.Daemon.Enabled, want.Daemon.Enabled)
 	assertEqual(t, loaded.Daemon.IdleTimeout.D(), want.Daemon.IdleTimeout.D())
 	assertEqual(t, loaded.Daemon.SpawnTimeout.D(), want.Daemon.SpawnTimeout.D())
@@ -257,6 +259,7 @@ func TestSaveLoadRoundtrip(t *testing.T) {
 
 	original := Default()
 	original.API.VoyageAPIKey = "test-key-abc123"
+	original.API.DeepInfraPriority = true
 
 	if err := original.Save(); err != nil {
 		t.Fatalf("Save: %v", err)
@@ -269,6 +272,7 @@ func TestSaveLoadRoundtrip(t *testing.T) {
 
 	// API
 	assertEqual(t, loaded.API.VoyageAPIKey, original.API.VoyageAPIKey)
+	assertEqual(t, loaded.API.DeepInfraPriority, original.API.DeepInfraPriority)
 
 	// Embedding
 	assertEqual(t, loaded.Embedding.Model, original.Embedding.Model)

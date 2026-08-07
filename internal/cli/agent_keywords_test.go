@@ -62,7 +62,7 @@ func TestSearchAgentOutput(t *testing.T) {
 	if !strings.Contains(output, `--section "authentication-flow"`) {
 		t.Fatalf("missing section flag: %s", output)
 	}
-	if !strings.Contains(output, "HINT: Read a file or section from the results above with your preferred reader command.") {
+	if !strings.Contains(output, "HINT: Scope search with --collection NAME, then use sift read") {
 		t.Fatalf("missing hint footer: %s", output)
 	}
 	if !strings.Contains(output, "Feedback: sift feedback") {
@@ -70,6 +70,21 @@ func TestSearchAgentOutput(t *testing.T) {
 	}
 	if strings.Contains(output, "(bm25") || strings.Contains(output, "(reranked") {
 		t.Fatalf("agent output should not expose ranking mode: %s", output)
+	}
+}
+
+func TestSearchAgentOutputNativeReadHint(t *testing.T) {
+	_, _ = setupIndexedCLIEnv(t)
+
+	cmd := NewRootCmd("test")
+	cmd.SetArgs([]string{"search", "authentication token", "--collection", "vault", "--agent"})
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("search --agent: %v", err)
+	}
+	if !strings.Contains(buf.String(), `HINT: sift read <file> --collection "vault" --section "<section>"`) {
+		t.Fatalf("missing directly reusable sift read hint: %s", buf.String())
 	}
 }
 

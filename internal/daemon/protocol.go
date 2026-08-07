@@ -192,18 +192,19 @@ type ProgressEvent struct {
 
 // HealthResponse is the response body for GET /health.
 type HealthResponse struct {
-	Ok              bool   `json:"ok"`
-	Version         string `json:"version"`
-	UptimeS         int64  `json:"uptime_s"`
-	PID             int    `json:"pid"`
-	RequestCount    int64  `json:"request_count"`
-	InFlight        int64  `json:"in_flight"`
-	TLSDialsTotal   int64  `json:"tls_dials_total"`
-	Goroutines      int    `json:"goroutines"`
-	StartedAt       string `json:"started_at"` // RFC3339
-	SocketPath      string `json:"socket_path,omitempty"`
-	IdleTimeoutSecs int64  `json:"idle_timeout_secs"`
-	DaemonLogPath   string `json:"daemon_log_path,omitempty"`
+	Ok               bool   `json:"ok"`
+	Version          string `json:"version"`
+	UptimeS          int64  `json:"uptime_s"`
+	PID              int    `json:"pid"`
+	RequestCount     int64  `json:"request_count"`
+	InFlight         int64  `json:"in_flight"`
+	VoyageConfigured bool   `json:"voyage_configured"`
+	TLSDialsTotal    int64  `json:"tls_dials_total"`
+	Goroutines       int    `json:"goroutines"`
+	StartedAt        string `json:"started_at"` // RFC3339
+	SocketPath       string `json:"socket_path,omitempty"`
+	IdleTimeoutSecs  int64  `json:"idle_timeout_secs"`
+	DaemonLogPath    string `json:"daemon_log_path,omitempty"`
 }
 
 // ---------------------------------------------------------------------------

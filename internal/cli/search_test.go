@@ -23,21 +23,21 @@ func TestIsMeaningfulLine(t *testing.T) {
 		line string
 		want bool
 	}{
-		{"", false},                         // empty
-		{"   ", false},                      // whitespace only
-		{"---", false},                      // markdown separator
-		{"===", false},                      // markdown separator
-		{"|---|---|---|", false},            // table separator
-		{"***", false},                      // horizontal rule
-		{"| | | |", false},                  // empty table row (only pipes and spaces)
-		{"abc", false},                      // too short (3 chars)
-		{"abcd", true},                      // exactly 4
-		{"Hello world", true},               // normal text
-		{"## GCP Projects", true},           // markdown heading
+		{"", false},                          // empty
+		{"   ", false},                       // whitespace only
+		{"---", false},                       // markdown separator
+		{"===", false},                       // markdown separator
+		{"|---|---|---|", false},             // table separator
+		{"***", false},                       // horizontal rule
+		{"| | | |", false},                   // empty table row (only pipes and spaces)
+		{"abc", false},                       // too short (3 chars)
+		{"abcd", true},                       // exactly 4
+		{"Hello world", true},                // normal text
+		{"## GCP Projects", true},            // markdown heading
 		{"| Store | Order ID | URL |", true}, // table header with content
-		{"`ePxLjCpjSHhzCPYjapUs`", true},    // code with alphanumeric
-		{"- item", true},                    // list item
-		{"1. First", true},                  // numbered list
+		{"`ePxLjCpjSHhzCPYjapUs`", true},     // code with alphanumeric
+		{"- item", true},                     // list item
+		{"1. First", true},                   // numbered list
 	}
 
 	for _, tt := range tests {

@@ -65,6 +65,10 @@ type FolderNode struct {
 
 	// Files is the per-file slice in alphabetic order.
 	Files []FileNode
+
+	// Children lists direct child-folder names, including children beyond a
+	// depth-limited walk. It lets orientation callers see where they can drill.
+	Children []string
 }
 
 // FileNode describes one entry in a folder's `[files."<rel>"]` table.
@@ -86,6 +90,8 @@ type FileNode struct {
 	// Summary / Words come from sift.toml.
 	Summary string
 	Words   int
+	Title   string
+	Excerpt string
 
 	// ContentHash is exposed mostly so callers can detect drift. The
 	// read view doesn't recompute it.
@@ -138,8 +144,9 @@ func DefaultLoadOptions() LoadOptions {
 // LoadTree never writes. It honors `.siftignore` rooted at root and the
 // per-folder/file `ignore` flag (unless opts.IncludeIgnored is set).
 //
-// `subPath` is optional. When non-empty, walk starts at root/subPath
-// instead of root, and FolderMap.Root reflects that subdirectory.
+// `subPath` is optional. When non-empty, the walk starts at root/subPath,
+// while FolderMap.Root and every returned path stay rooted at root. This
+// makes subtree output directly reusable as a collection-relative path.
 func LoadTree(ctx context.Context, root, subPath string, opts LoadOptions) (*FolderMap, error) {
 	if root == "" {
 		return nil, errors.New("load: empty root")
@@ -152,15 +159,22 @@ func LoadTree(ctx context.Context, root, subPath string, opts LoadOptions) (*Fol
 	if err != nil {
 		return nil, fmt.Errorf("load: resolve root: %w", err)
 	}
+	walkRoot := abs
+	relBase := "."
 	if subPath != "" {
-		abs = filepath.Join(abs, subPath)
+		cleanSubPath := filepath.Clean(subPath)
+		if filepath.IsAbs(cleanSubPath) || cleanSubPath == ".." || strings.HasPrefix(cleanSubPath, ".."+string(os.PathSeparator)) {
+			return nil, fmt.Errorf("load: subpath %q must stay inside root", subPath)
+		}
+		walkRoot = filepath.Join(abs, cleanSubPath)
+		relBase = filepath.ToSlash(cleanSubPath)
 	}
-	info, err := os.Stat(abs)
+	info, err := os.Stat(walkRoot)
 	if err != nil {
 		return nil, fmt.Errorf("load: stat root: %w", err)
 	}
 	if !info.IsDir() {
-		return nil, fmt.Errorf("load: root %q is not a directory", abs)
+		return nil, fmt.Errorf("load: root %q is not a directory", walkRoot)
 	}
 
 	patterns, ierr := ignore.LoadPatterns(abs)
@@ -169,7 +183,7 @@ func LoadTree(ctx context.Context, root, subPath string, opts LoadOptions) (*Fol
 	}
 
 	fm := &FolderMap{Root: abs}
-	if err := loadWalk(ctx, abs, patterns, opts, fm); err != nil {
+	if err := loadWalk(ctx, walkRoot, abs, relBase, patterns, opts, fm); err != nil {
 		return nil, err
 	}
 
@@ -182,13 +196,13 @@ func LoadTree(ctx context.Context, root, subPath string, opts LoadOptions) (*Fol
 // loadWalk performs the descent. Mirrors check.walkTree — DFS with a
 // stack so per-folder `ignore = true` can prune subtrees before reading
 // them.
-func loadWalk(ctx context.Context, root string, patterns []string, opts LoadOptions, fm *FolderMap) error {
+func loadWalk(ctx context.Context, walkRoot, ignoreRoot, relBase string, patterns []string, opts LoadOptions, fm *FolderMap) error {
 	type item struct {
 		abs   string
 		rel   string
 		depth int
 	}
-	stack := []item{{abs: root, rel: ".", depth: 0}}
+	stack := []item{{abs: walkRoot, rel: relBase, depth: 0}}
 
 	for len(stack) > 0 {
 		if err := ctx.Err(); err != nil {
@@ -218,7 +232,7 @@ func loadWalk(ctx context.Context, root string, patterns []string, opts LoadOpti
 				continue
 			}
 			abs := filepath.Join(cur.abs, name)
-			if patterns != nil && ignore.ShouldIgnore(abs, root, patterns) {
+			if patterns != nil && ignore.ShouldIgnore(abs, ignoreRoot, patterns) {
 				continue
 			}
 			if e.IsDir() {
@@ -312,6 +326,15 @@ func loadWalk(ctx context.Context, root string, patterns []string, opts LoadOpti
 		}
 		node.LastModified = newest
 		node.Files = files
+		for _, sd := range subdirs {
+			if folderIdx != nil && !opts.IncludeIgnored {
+				if cf, ok := folderIdx.Folders[sd.Name()]; ok && cf.Ignore {
+					continue
+				}
+			}
+			node.Children = append(node.Children, sd.Name())
+		}
+		sort.Strings(node.Children)
 
 		fm.Folders = append(fm.Folders, node)
 
@@ -402,7 +425,7 @@ func kindFromName(name string) string {
 // flavors only.
 func IsTextKind(kind string) bool {
 	switch kind {
-	case "md", "markdown", "mdx", "rst", "org", "txt":
+	case "md", "markdown", "mdx", "qmd", "rst", "org", "txt":
 		return true
 	}
 	return false

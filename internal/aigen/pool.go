@@ -327,7 +327,7 @@ func processOneJob(ctx context.Context, j Job, gen Generator, stats *poolStats, 
 	ms := time.Since(startedAt).Milliseconds()
 	tokensIn := res.TotalTokensIn()
 	tokensOut := res.TotalTokensOut()
-	cost := CostUSD(tokensIn, tokensOut)
+	cost := res.TotalCostUSD()
 
 	stats.mu.Lock()
 	stats.completed++
@@ -359,7 +359,7 @@ func recordCalls(stats *poolStats, calls []CallStats) {
 		}
 		stats.tokensIn += c.TokensIn
 		stats.tokensOut += c.TokensOut
-		stats.costUSD += CostUSD(c.TokensIn, c.TokensOut)
+		stats.costUSD += callCostUSD(c)
 	}
 }
 

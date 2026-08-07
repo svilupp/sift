@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mattn/go-isatty"
@@ -80,6 +81,7 @@ func newIndexCmd() *cobra.Command {
 		collection     string
 		depth          int
 		jsonOut        bool
+		orient         bool
 		markdownOut    bool
 		includeIgnored bool
 		sections       bool
@@ -91,13 +93,14 @@ func newIndexCmd() *cobra.Command {
 		Use:   "index [path]",
 		Short: "Read or lint per-folder sift.toml metadata (TOC view)",
 		Long: `Walk a directory tree, parse each sift.toml, and emit a structured
-table of contents — purpose / use_when / per-file summaries.
+semantic table of contents — purpose / use_when / per-file summaries.
 
 Subcommands:
   check    Walk a tree and report missing, stale, or orphaned entries.
 
-With no subcommand, sift index emits the read view. Auto-detect: TTY → markdown
-tree, piped → JSON envelope. Override with --json or --markdown.
+Use --orient for the compact agent view: it defaults to depth 1 and includes
+editorial summaries where available, with local extractive prose/headings as a
+fallback. Auto-detect: TTY → markdown tree, piped → detailed JSON envelope.
 
 Filters compose AND-style and apply to both the read view and check:
   --path GLOB     gitignore-style glob ("docs/**", "*.md")
@@ -105,12 +108,12 @@ Filters compose AND-style and apply to both the read view and check:
   --file PATH     explicit file path (repeatable)
 
 Examples:
-  sift index                              # current directory, TTY → markdown
-  sift index docs --depth 1               # only direct children
-  sift index docs --json | jq .digest     # one-paragraph orientation
-  sift index --path 'docs/**' --since 7d  # AND-combined filters
-  sift index --collection vault --markdown
-  sift index check                        # lint mode (Phase-2)`,
+  sift collections --json                       # discover collection names
+  sift index --collection vault --orient        # semantic root + one level
+  sift index docs --collection vault --orient   # drill into a relevant branch
+  sift index docs --collection vault --json     # detailed subtree with sections
+  sift index --path 'docs/**' --since 7d        # AND-combined filters
+  sift index check                              # local integrity checks`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
@@ -118,12 +121,16 @@ Examples:
 			// Track whether --sections was explicitly set so we can pick
 			// format-aware defaults below.
 			sectionsSet := cmd.Flags().Changed("sections")
+			depthSet := cmd.Flags().Changed("depth")
 
-			if jsonOut && markdownOut {
+			if (jsonOut || orient) && markdownOut {
 				return &indexCheckError{code: 1, msg: "cannot use --json with --markdown"}
 			}
+			if orient && !depthSet {
+				depth = 1
+			}
 
-			root, err := resolveCheckRoot(args, collection)
+			root, subPath, err := resolveIndexTarget(args, collection)
 			if err != nil {
 				return &indexCheckError{code: 1, msg: err.Error()}
 			}
@@ -133,7 +140,7 @@ Examples:
 				ctx = context.Background()
 			}
 
-			fm, err := index.LoadTree(ctx, root, "", index.LoadOptions{
+			fm, err := index.LoadTree(ctx, root, subPath, index.LoadOptions{
 				Depth:          depth,
 				IncludeIgnored: includeIgnored,
 			})
@@ -149,7 +156,7 @@ Examples:
 				fm = index.ApplyFilters(fm, filterOpts)
 			}
 
-			format := chooseFormat(jsonOut, markdownOut)
+			format := chooseFormat(jsonOut || orient, markdownOut)
 			out := cmd.OutOrStdout()
 
 			// Format-aware defaults for sections: JSON on by default,
@@ -163,10 +170,25 @@ Examples:
 				Sections:   useSections,
 				Summaries:  summaries,
 				Collection: collection,
+				SubPath:    filepath.ToSlash(subPath),
 			}
 
-			if useSections {
+			if useSections || orient {
 				index.AttachSections(ctx, fm)
+			}
+			if orient {
+				data, err := index.RenderOrientationJSON(fm, index.OrientationOptions{
+					Collection: collection,
+					SubPath:    filepath.ToSlash(subPath),
+					LocalOnly:  !summaries,
+				})
+				if err != nil {
+					return &indexCheckError{code: 1, msg: err.Error()}
+				}
+				if _, err := out.Write(data); err != nil {
+					return &indexCheckError{code: 1, msg: err.Error()}
+				}
+				return nil
 			}
 
 			switch format {
@@ -199,10 +221,11 @@ Examples:
 	cmd.Flags().StringVarP(&collection, "collection", "c", "", "Walk this collection's root path")
 	cmd.Flags().IntVar(&depth, "depth", -1, "Limit descent depth (0=root, 1=direct children, -1=unbounded)")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit JSON")
+	cmd.Flags().BoolVar(&orient, "orient", false, "Emit a compact semantic JSON map for agents (default depth: 1)")
 	cmd.Flags().BoolVar(&markdownOut, "markdown", false, "Emit markdown tree")
 	cmd.Flags().BoolVar(&includeIgnored, "include-ignored", false, "Include folders/files marked ignore = true")
 	cmd.Flags().BoolVar(&sections, "sections", false, "Include H1/H2 section outlines per file (default: on for JSON, off for markdown)")
-	cmd.Flags().BoolVar(&summaries, "summaries", true, "Include folder purpose and file summaries")
+	cmd.Flags().BoolVar(&summaries, "summaries", true, "Include editorial purpose/summaries (false keeps local extractive orientation)")
 	bindIndexFilterFlags(cmd, &filters)
 
 	cmd.AddCommand(newIndexCheckCmd())
@@ -216,6 +239,7 @@ func newIndexCheckCmd() *cobra.Command {
 		markdownOut    bool
 		includeIgnored bool
 		includeAll     bool
+		requireSummary bool
 		filters        indexFilterFlags
 	)
 
@@ -227,9 +251,11 @@ func newIndexCheckCmd() *cobra.Command {
   - missing sift.toml in a folder that contains files
   - parse errors in malformed sift.toml
   - stale entries (file content has drifted since the last index)
-  - missing summaries (entry present but Summary == "")
   - orphaned entries (entry references a file that is gone, or a file
     on disk has no corresponding entry)
+
+Missing summaries are optional because a fully local index is valid. Pass
+--require-summaries when editorial/AI-generated summary coverage is a policy.
 
 The walker honors .siftignore at the root and per-folder/per-file
 ignore = true flags. Pass --include-ignored to lint those too.
@@ -254,6 +280,7 @@ Examples:
   sift index check                           # current directory
   sift index check ./docs
   sift index check --collection vault
+  sift index check --collection vault --require-summaries
   sift index check ./docs --json | jq .
   sift index check ./docs --markdown > REPORT.md
   sift index check --path 'docs/**'`,
@@ -261,7 +288,7 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			root, err := resolveCheckRoot(args, collection)
+			root, subPath, err := resolveIndexTarget(args, collection)
 			if err != nil {
 				return &indexCheckError{code: 1, msg: err.Error()}
 			}
@@ -271,9 +298,11 @@ Examples:
 				ctx = context.Background()
 			}
 
-			report, err := index.Check(ctx, root, index.CheckOptions{
+			checkRoot := filepath.Join(root, subPath)
+			report, err := index.Check(ctx, checkRoot, index.CheckOptions{
 				IncludeIgnored: includeIgnored,
 				IncludeAll:     includeAll,
+				RequireSummary: requireSummary,
 			})
 			if err != nil {
 				return &indexCheckError{code: 1, msg: err.Error()}
@@ -324,6 +353,7 @@ Examples:
 	cmd.Flags().BoolVar(&markdownOut, "markdown", false, "Emit markdown")
 	cmd.Flags().BoolVar(&includeIgnored, "include-ignored", false, "Lint folders/files marked ignore = true too")
 	cmd.Flags().BoolVar(&includeAll, "all", false, "Include non-text files in orphan checks (e.g., .go, .py, .rs)")
+	cmd.Flags().BoolVar(&requireSummary, "require-summaries", false, "Report empty file summaries as defects")
 	bindIndexFilterFlags(cmd, &filters)
 
 	return cmd
@@ -446,41 +476,48 @@ func folderPassesCheckFilter(folder string, f index.Filters) bool {
 	return true
 }
 
-// resolveCheckRoot picks the directory to walk. Precedence:
-//  1. positional arg, if present
-//  2. --collection, looked up via the registered collections table
-//  3. current working directory
-func resolveCheckRoot(args []string, collection string) (string, error) {
-	if len(args) > 0 && args[0] != "" {
-		if collection != "" {
-			return "", fmt.Errorf("cannot use --collection with a positional path")
-		}
-		return filepath.Abs(args[0])
-	}
+// resolveIndexTarget returns a walk root and a path relative to it. With a
+// collection, a positional path is deliberately collection-relative so agents
+// can orient at the root and drill into a selected branch using one contract.
+func resolveIndexTarget(args []string, collection string) (string, string, error) {
 	if collection != "" {
 		dbPath, err := config.DBPath()
 		if err != nil {
-			return "", fmt.Errorf("resolve db path: %w", err)
+			return "", "", fmt.Errorf("resolve db path: %w", err)
 		}
 		database, err := db.Open(dbPath)
 		if err != nil {
-			return "", fmt.Errorf("open db: %w", err)
+			return "", "", fmt.Errorf("open db: %w", err)
 		}
 		defer database.Close()
 		col, err := database.GetCollection(collection)
 		if err != nil {
-			return "", fmt.Errorf("lookup collection %q: %w", collection, err)
+			return "", "", fmt.Errorf("lookup collection %q: %w", collection, err)
 		}
 		if col == nil {
-			return "", fmt.Errorf("collection %q not found", collection)
+			return "", "", fmt.Errorf("collection %q not found", collection)
 		}
-		return col.Path, nil
+		subPath := ""
+		if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
+			candidate := filepath.Clean(args[0])
+			if filepath.IsAbs(candidate) || candidate == ".." || strings.HasPrefix(candidate, ".."+string(os.PathSeparator)) {
+				return "", "", fmt.Errorf("path %q must stay inside collection %q", args[0], collection)
+			}
+			if candidate != "." {
+				subPath = candidate
+			}
+		}
+		return col.Path, subPath, nil
+	}
+	if len(args) > 0 && args[0] != "" {
+		root, err := filepath.Abs(args[0])
+		return root, "", err
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("getwd: %w", err)
+		return "", "", fmt.Errorf("getwd: %w", err)
 	}
-	return cwd, nil
+	return cwd, "", nil
 }
 
 // chooseFormat picks the output format honoring explicit flags first,

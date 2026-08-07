@@ -88,6 +88,7 @@ type CallStats struct {
 	TokensIn     int
 	TokensOut    int
 	CachedTokens int
+	CostUSD      float64
 	LatencyMs    int64
 	HTTPStatus   int
 	Attempts     int
@@ -124,6 +125,25 @@ func (g *GenerateResult) TotalTokensOut() int {
 		n += c.TokensOut
 	}
 	return n
+}
+
+// TotalCostUSD returns the cumulative estimated cost across all calls.
+func (g *GenerateResult) TotalCostUSD() float64 {
+	if g == nil {
+		return 0
+	}
+	var cost float64
+	for _, c := range g.Calls {
+		cost += callCostUSD(c)
+	}
+	return cost
+}
+
+func callCostUSD(c CallStats) float64 {
+	if c.CostUSD > 0 {
+		return c.CostUSD
+	}
+	return CostUSD(c.TokensIn, c.TokensOut)
 }
 
 // Generator is the interface satisfied by the production aigen client

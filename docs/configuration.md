@@ -15,7 +15,17 @@ sift config get <key>          # read a value
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `voyage_api_key` | string | `""` | Voyage AI API key. Enables vector search and reranking. |
+| `deepinfra_api_key` | string | `""` | DeepInfra API key. Enables AI-generated `sift.toml` summaries. |
+| `deepinfra_priority` | bool | `false` | Send `service_tier="priority"` on DeepInfra summary-generation requests. |
 | `request_timeout_seconds` | int | `60` | HTTP timeout for API calls. |
+
+Enable DeepInfra's priority tier for folder-summary generation when needed:
+
+```bash
+sift config set api.deepinfra_priority true
+```
+
+The setting defaults to `false`; when disabled, SIFT omits `service_tier` and DeepInfra uses its standard tier.
 
 ### `[embedding]`
 
@@ -117,10 +127,22 @@ boost = 0.7
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `enabled` | bool | `true` | Currently informational; CLI gating is via `SIFT_NO_DAEMON`. |
+| `enabled` | bool | `true` | Enable daemon use and auto-spawn. Setting this to `false` stops a running daemon and keeps search/refresh in-process. |
 | `idle_timeout` | duration | `"30m"` | Daemon exits after this much idle time (`"0"` = never exit). |
 | `spawn_timeout` | duration | `"300ms"` | Max wait for `/health` after `daemon start` / auto-spawn. |
 | `dial_timeout` | duration | `"50ms"` | Max wait when probing an existing daemon socket. |
+
+Disable the daemon persistently with:
+
+```bash
+sift config set daemon.enabled false
+```
+
+This is independent of AI usage. With no Voyage API key, SIFT may still run
+the daemon, but the daemon does not construct a Voyage client or make
+embedding/reranking requests; search and refresh use local BM25 only. Clearing
+the key through `sift config set api.voyage_api_key ""` restarts an already
+running daemon so it cannot retain the previous client.
 
 ### `[transport]`
 

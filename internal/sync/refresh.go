@@ -92,6 +92,9 @@ type collectionMatcher struct {
 // Refresh performs an incremental index refresh.
 // If voyageClient is nil, embedding is skipped (BM25-only mode).
 func Refresh(ctx context.Context, database *db.DB, bleveIdx *bm25.BleveIndex, voyageClient *voyage.Client, opts RefreshOptions, w io.Writer) (*RefreshStats, error) {
+	if !voyageClient.Configured() {
+		voyageClient = nil
+	}
 	stats := &RefreshStats{}
 	start := time.Now()
 
@@ -117,6 +120,16 @@ func Refresh(ctx context.Context, database *db.DB, bleveIdx *bm25.BleveIndex, vo
 	seenScanned := make(map[string]struct{})
 
 	for _, col := range scanCollections {
+		if _, statErr := os.Stat(col.Path); statErr != nil {
+			if os.IsNotExist(statErr) {
+				if opts.CollectionName != "" {
+					return stats, fmt.Errorf("refresh %q: collection path missing: %s", col.Name, col.Path)
+				}
+				fmt.Fprintf(w, "  Warning: collection path missing, skipping: %s\n", col.Path)
+				continue
+			}
+			return stats, fmt.Errorf("refresh %q: stat collection path: %w", col.Name, statErr)
+		}
 		if err := refreshCollection(ctx, database, bleveIdx, voyageClient, col, matcher, opts, stats, seenScanned, w); err != nil {
 			return stats, fmt.Errorf("refresh %q: %w", col.Name, err)
 		}
@@ -130,6 +143,9 @@ func Refresh(ctx context.Context, database *db.DB, bleveIdx *bm25.BleveIndex, vo
 // Each file is resolved to its parent collection via DB lookup or path prefix match.
 // If voyageClient is nil, embedding is skipped (BM25-only mode).
 func RefreshFiles(ctx context.Context, database *db.DB, bleveIdx *bm25.BleveIndex, voyageClient *voyage.Client, paths []string, opts RefreshOptions, w io.Writer) (*RefreshStats, error) {
+	if !voyageClient.Configured() {
+		voyageClient = nil
+	}
 	stats := &RefreshStats{}
 	start := time.Now()
 

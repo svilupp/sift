@@ -124,8 +124,11 @@ summaries describe each folder's `purpose` / `use_when` and per-file
 (`--with-index`, on).
 
 ```bash
-sift index                                       # read the tree (TTY=md, pipe=json)
-sift index check                                 # lint for stale/missing entries
+sift collections --json                          # discover collections for an agent
+sift index --collection vault --orient           # semantic root + one level, fully local
+sift index docs --collection vault --orient      # drill into a relevant branch
+sift index check                                 # local integrity checks
+sift read docs/guide.md -c vault --section setup # read a selected leaf
 sift refresh --index-only --generate=missing     # AI-bootstrap empty fields
 ```
 

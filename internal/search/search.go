@@ -128,6 +128,9 @@ type scoredCandidate struct {
 
 // NewEngine creates a search engine.
 func NewEngine(database *db.DB, bleveIdx *bm25.BleveIndex, voyageClient *voyage.Client, cfg *config.Config) *Engine {
+	if !voyageClient.Configured() {
+		voyageClient = nil
+	}
 	return &Engine{
 		DB:       database,
 		BleveIdx: bleveIdx,

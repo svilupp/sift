@@ -364,6 +364,12 @@ func TestServeUnixSocketLifecycle(t *testing.T) {
 	if !hr.Ok {
 		t.Errorf("/health ok: want true")
 	}
+	if hr.VoyageConfigured {
+		t.Error("/health voyage_configured: want false without an API key")
+	}
+	if hr.TLSDialsTotal != 0 {
+		t.Errorf("/health tls_dials_total = %d, want 0 without an API key", hr.TLSDialsTotal)
+	}
 
 	// /shutdown
 	resp, err = client.Post("http://unix/shutdown", "application/json", nil)
@@ -388,6 +394,27 @@ func TestServeUnixSocketLifecycle(t *testing.T) {
 	pidPath, _ := config.PIDPath()
 	if _, err := os.Stat(pidPath); !os.IsNotExist(err) {
 		t.Errorf("pid file still exists: err=%v", err)
+	}
+}
+
+func TestNewVoyageClientRequiresAPIKey(t *testing.T) {
+	cfg := config.Default()
+	for _, key := range []string{"", "  \t\n"} {
+		cfg.API.VoyageAPIKey = key
+		if got := newVoyageClient(cfg); got != nil {
+			t.Fatalf("newVoyageClient(%q) = non-nil, want nil", key)
+		}
+	}
+
+	cfg.API.VoyageAPIKey = "test-key"
+	cfg.Embedding.Model = "custom-embed"
+	cfg.Reranking.Model = "custom-rerank"
+	got := newVoyageClient(cfg)
+	if got == nil || !got.Configured() {
+		t.Fatal("newVoyageClient(configured) = nil or unconfigured")
+	}
+	if got.EmbedModel != "custom-embed" || got.RerankModel != "custom-rerank" {
+		t.Fatalf("models not propagated: embed=%q rerank=%q", got.EmbedModel, got.RerankModel)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,9 +12,14 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 )
+
+// ErrNotConfigured is returned before any network request when a Voyage
+// client has no usable API key.
+var ErrNotConfigured = errors.New("voyage API key is not configured")
 
 const (
 	// DefaultBaseURL is the Voyage AI API base URL.
@@ -187,6 +193,18 @@ func NewClientWithBaseURL(apiKey, baseURL string) *Client {
 	return newClient(apiKey, baseURL, defaultTransportConfig)
 }
 
+// HasAPIKey reports whether an API key contains a non-whitespace value.
+func HasAPIKey(apiKey string) bool {
+	return strings.TrimSpace(apiKey) != ""
+}
+
+// Configured reports whether this client can make authenticated requests.
+// It is nil-safe so dependency boundaries can normalize an unconfigured
+// client to nil without special casing.
+func (c *Client) Configured() bool {
+	return c != nil && HasAPIKey(c.apiKey)
+}
+
 // DialCount returns the number of fresh TCP/TLS dials initiated through this
 // client's transport. Useful for verifying connection reuse.
 func (c *Client) DialCount() int64 {
@@ -197,6 +215,9 @@ func (c *Client) DialCount() int64 {
 // TLS handshake and populate the idle-connection pool. It is safe to call
 // many times; each call drains and closes the response body.
 func (c *Client) Preconnect(ctx context.Context) error {
+	if !c.Configured() {
+		return ErrNotConfigured
+	}
 	url := c.baseURL + "/"
 	c.logger.Info("preconnect start", slog.String("url", url))
 
@@ -284,6 +305,9 @@ type rerankResponse struct {
 // Embed calls the Voyage embeddings API.
 // inputType should be "query" for search queries or "document" for indexing.
 func (c *Client) Embed(ctx context.Context, texts []string, inputType string) ([][]float32, Usage, error) {
+	if !c.Configured() {
+		return nil, Usage{}, ErrNotConfigured
+	}
 	reqBody := embedRequest{
 		Input:           texts,
 		Model:           c.EmbedModel,
@@ -317,6 +341,9 @@ func (c *Client) Embed(ctx context.Context, texts []string, inputType string) ([
 
 // Rerank calls the Voyage reranking API.
 func (c *Client) Rerank(ctx context.Context, query string, docs []string, topK int) ([]RerankResult, Usage, error) {
+	if !c.Configured() {
+		return nil, Usage{}, ErrNotConfigured
+	}
 	reqBody := rerankRequest{
 		Query:     query,
 		Documents: docs,

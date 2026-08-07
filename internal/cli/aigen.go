@@ -32,6 +32,7 @@ type aigenRunOptions struct {
 	APIKey         string
 	BaseURL        string
 	Model          string
+	Priority       bool
 	Database       *db.DB
 	CollectionRoot string
 	CollectionName string
@@ -109,6 +110,7 @@ func runAigenForPlans(ctx context.Context, pending []pendingFolder, opts aigenRu
 	if opts.Model != "" {
 		client.SetModel(opts.Model)
 	}
+	client.SetPriority(opts.Priority)
 	gen := aigen.NewFolderGenerator(client)
 
 	jobs := make([]aigen.Job, 0, len(pending))

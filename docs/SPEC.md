@@ -39,7 +39,7 @@ SIFT is a local-first semantic search engine for personal knowledge management. 
 
 ```bash
 # Install
-go install github.com/svilupp/go-training-range/sift/cmd/sift@latest
+go install github.com/svilupp/sift/cmd/sift@latest
 
 # Initialize (creates ~/.sift/, prompts for API key)
 sift config init
@@ -237,8 +237,10 @@ CREATE TABLE search_sessions (
 ### Top-Level Commands
 
 ```bash
-sift search <query> [flags]        # Search across collections
+sift search <query words...> [flags] # Search across collections
 sift refresh [flags]               # Incremental index refresh
+sift index [path] [flags]          # Semantic tree orientation / detailed index
+sift read <file> [flags]           # Read an exact file, section, or line range
 sift feedback <search_id> [flags]  # Provide feedback on results
 sift sql [query]                   # SQLite shell (read-only)
 sift collections [subcommand]      # Manage collections
@@ -266,6 +268,7 @@ sift config logs --feedback        # Show feedback logs
 
 ```bash
 sift collections                   # List all collections
+sift collections --json            # Stable machine-readable discovery
 sift collections add <name> <path> # Add collection
 sift collections add <name> <path> --tags work,2024
 sift collections remove <name>     # Remove collection (keeps files)
@@ -274,7 +277,7 @@ sift collections remove <name>     # Remove collection (keeps files)
 ### `sift search`
 
 ```bash
-sift search <query>                # Pretty output (default)
+sift search <query words...>       # Quoted or unquoted multi-word query
 sift search <query> --json         # JSON for agents
 sift search <query> --files        # File paths only
 sift search <query> -c <collection> # Filter by collection
@@ -1042,7 +1045,7 @@ encoder.
       "last_modified": "2026-05-01T12:14:33Z",
       "files": [
         {
-          "path": "architecture.md",
+          "path": "docs/architecture.md",
           "kind": "md",
           "ignore": false,
           "bytes": 8420,
@@ -1050,6 +1053,8 @@ encoder.
           "mtime": "2026-04-30T18:02:11Z",
           "content_hash": "1f2a...",
           "summary": "...",
+          "title": "Architecture",
+          "excerpt": "Explains the search and indexing pipeline.",
           "exists": true,
           "sections": [
             {"heading": "Data Flow", "level": 2, "start_line": 3, "end_line": 24}
@@ -1075,6 +1080,14 @@ encoder.
 
 `folders[].files[].sections` is omitted when `--sections=false` (default
 in markdown output).
+
+For agent routing, `sift index [path] --collection NAME --orient` emits
+the compact semantic subset: stable collection-relative paths, purpose
+and summary provenance, direct children, file titles, short summaries,
+topics, and word counts. It defaults to depth 1, omits binary-only
+leaves and mechanical hashes, and always emits arrays (including empty
+ones). Editorial `sift.toml` text is preferred; fully local mode falls
+back to verbatim prose, headings, and titles.
 
 ## `sift refresh --progress=json` NDJSON Events
 

@@ -94,6 +94,31 @@ func loadDaemonTimeouts() (spawnTimeout, stopTimeout time.Duration) {
 	return spawnTimeout, stopTimeout
 }
 
+func requireDaemonEnabled() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	if !cfg.Daemon.Enabled {
+		return fmt.Errorf("daemon is disabled; run `sift config set daemon.enabled true` to enable it")
+	}
+	return nil
+}
+
+// ensureDaemonStoppedForLocalMode makes a persisted daemon.enabled=false
+// safe even when the config file was edited by hand while a daemon was
+// already running. Otherwise the in-process path can contend for Bleve.
+func ensureDaemonStoppedForLocalMode() error {
+	report := daemon.GetStatus(statusProbeTimeout)
+	if report.State == daemon.StatusNotRunning {
+		return nil
+	}
+	if err := daemon.Stop(defaultStopTimeout); err != nil {
+		return fmt.Errorf("daemon is disabled but could not be stopped: %w", err)
+	}
+	return nil
+}
+
 // ---------------------------------------------------------------------------
 // start
 // ---------------------------------------------------------------------------
@@ -111,6 +136,9 @@ it answers or --timeout elapses.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
+			if err := requireDaemonEnabled(); err != nil {
+				return err
+			}
 			spawnDefault, _ := loadDaemonTimeouts()
 			timeout, err := resolveTimeout(timeoutStr, spawnDefault)
 			if err != nil {
@@ -223,6 +251,9 @@ shot. Useful after upgrading the binary.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
+			if err := requireDaemonEnabled(); err != nil {
+				return err
+			}
 			timeout, err := resolveTimeout(timeoutStr, defaultStopTimeout)
 			if err != nil {
 				return err
@@ -322,6 +353,7 @@ func printStatusHuman(w io.Writer, r daemon.StatusReport) {
 		}
 		if r.Health != nil {
 			fmt.Fprintf(w, "uptime: %s\n", formatSeconds(r.Health.UptimeS))
+			fmt.Fprintf(w, "voyage_configured: %t\n", r.Health.VoyageConfigured)
 			fmt.Fprintf(w, "tls_dials: %d\n", r.Health.TLSDialsTotal)
 			fmt.Fprintf(w, "requests: %d\n", r.Health.RequestCount)
 			fmt.Fprintf(w, "version: %s\n", r.Health.Version)

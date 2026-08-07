@@ -70,6 +70,7 @@ type jsonFolder struct {
 	WordCount    int        `json:"word_count"`
 	LastModified string     `json:"last_modified,omitempty"`
 	Files        []jsonFile `json:"files"`
+	Children     []string   `json:"children,omitempty"`
 }
 
 type jsonFile struct {
@@ -81,6 +82,8 @@ type jsonFile struct {
 	Mtime       string        `json:"mtime,omitempty"`
 	ContentHash string        `json:"content_hash,omitempty"`
 	Summary     string        `json:"summary,omitempty"`
+	Title       string        `json:"title,omitempty"`
+	Excerpt     string        `json:"excerpt,omitempty"`
 	Exists      bool          `json:"exists"`
 	Sections    []SectionNode `json:"sections,omitempty"`
 }
@@ -110,6 +113,7 @@ func RenderTreeJSON(fm *FolderMap, opts RenderOptions) ([]byte, error) {
 			ParseError: f.ParseError,
 			FileCount:  f.Refresh.FileCount,
 			WordCount:  f.Refresh.WordCount,
+			Children:   append([]string(nil), f.Children...),
 		}
 		if opts.Summaries {
 			jf.Purpose = f.Purpose
@@ -145,6 +149,8 @@ func RenderTreeJSON(fm *FolderMap, opts RenderOptions) ([]byte, error) {
 				Words:       fl.Words,
 				ContentHash: fl.ContentHash,
 				Exists:      fl.Exists,
+				Title:       fl.Title,
+				Excerpt:     fl.Excerpt,
 			}
 			if !fl.Mtime.IsZero() {
 				jfl.Mtime = fl.Mtime.UTC().Format(time.RFC3339)
@@ -178,15 +184,16 @@ func RenderTreeJSON(fm *FolderMap, opts RenderOptions) ([]byte, error) {
 // suggests ~500 chars.
 const DigestMaxChars = 500
 
-// computeDigest concatenates the first sentence of each non-empty
-// folder Purpose into one paragraph, capped at DigestMaxChars.
+// computeDigest concatenates the best semantic description available for
+// each folder. Editorial purposes win; otherwise deterministic titles and
+// extractive file context keep local-only indexes useful.
 func computeDigest(fm *FolderMap) string {
 	var b strings.Builder
 	for _, f := range fm.Folders {
-		if f.Purpose == "" {
-			continue
-		}
 		s := firstSentence(f.Purpose)
+		if s == "" {
+			s = fallbackFolderSummary(f)
+		}
 		if s == "" {
 			continue
 		}
@@ -203,6 +210,57 @@ func computeDigest(fm *FolderMap) string {
 		out = strings.TrimSpace(out[:DigestMaxChars]) + "..."
 	}
 	return out
+}
+
+func fallbackFolderSummary(f FolderNode) string {
+	label := f.Path
+	if label == "." {
+		label = "Root"
+	}
+	var descriptions []string
+	for _, file := range f.Files {
+		title := file.Title
+		if title == "" {
+			title = titleFromFilename(file.Name)
+		}
+		detail := firstSentence(file.Excerpt)
+		if detail == "" && len(file.Sections) > 1 {
+			detail = "Topics: " + joinSectionTopics(file, 3)
+		}
+		if detail != "" {
+			descriptions = append(descriptions, title+": "+detail)
+		} else if title != "" {
+			descriptions = append(descriptions, title)
+		}
+		if len(descriptions) == 2 {
+			break
+		}
+	}
+	if len(descriptions) > 0 {
+		return truncate(label+" — "+strings.Join(descriptions, "; "), 300)
+	}
+	if len(f.Children) > 0 {
+		children := f.Children
+		if len(children) > 4 {
+			children = children[:4]
+		}
+		return fmt.Sprintf("%s — child areas: %s.", label, strings.Join(children, ", "))
+	}
+	return ""
+}
+
+func joinSectionTopics(file FileNode, limit int) string {
+	var topics []string
+	for _, section := range file.Sections {
+		if file.Title != "" && strings.EqualFold(section.Heading, file.Title) {
+			continue
+		}
+		topics = append(topics, section.Heading)
+		if len(topics) == limit {
+			break
+		}
+	}
+	return strings.Join(topics, ", ")
 }
 
 // firstSentence pulls the first sentence-ish chunk out of a paragraph.

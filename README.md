@@ -5,9 +5,12 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=flat)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/svilupp/sift?style=flat)](https://goreportcard.com/report/github.com/svilupp/sift)
 
-**Search Index for Finding Things** — local-first hybrid search for personal knowledge files.
+**Search Index for Finding Things** — local-first search and semantic navigation for personal knowledge files.
 
-SIFT combines BM25 keyword search, vector embeddings, and neural reranking to find what you need across markdown, plaintext, and JSONL files. Inspired by [Query Markup Documents (QMD)](https://github.com/tobi/qmd), but built for personal memory retrieval.
+SIFT always provides local BM25 search. With an optional API key it adds
+vector embeddings and neural reranking. Its folder index gives agents a
+compact semantic map using curated summaries or fully local extractive
+fallbacks. Inspired by [Query Markup Documents (QMD)](https://github.com/tobi/qmd), but built for personal memory retrieval.
 
 ## What Makes SIFT Different
 
@@ -32,6 +35,12 @@ sift refresh
 sift search "authentication flow"
 sift search "rate limiting" --pretty
 sift search "architecture" --agent --read-command "mem read"  # wrapper-friendly hint override
+
+# Let an agent orient, drill down, and read without any API key
+sift collections --json
+sift index --collection notes --orient
+sift index projects --collection notes --orient
+sift read projects/current.md --collection notes --section status
 ```
 
 ## Output Modes
@@ -71,12 +80,13 @@ you need precise lookup without full collection indexing.
 
 ## How It Works
 
-Every query runs BM25 and vector search in parallel, then merges results:
+Every query runs BM25. When an API key is available, SIFT also runs the
+optional semantic stages:
 
 1. **BM25** via [Bleve](https://blevesearch.com/) — keyword matching with highlight extraction
-2. **Vector search** — cosine similarity on binary embeddings ([Voyage AI](https://www.voyageai.com/) `voyage-4-lite`)
-3. **Reciprocal Rank Fusion** — merges both ranked lists with top-position boosting
-4. **Reranking** — Voyage `rerank-2.5-lite` rescores the top 75 for semantic precision
+2. **Vector search (optional)** — cosine similarity on binary embeddings ([Voyage AI](https://www.voyageai.com/) `voyage-4-lite`)
+3. **Reciprocal Rank Fusion (optional)** — merges both ranked lists with top-position boosting
+4. **Reranking (optional)** — Voyage `rerank-2.5-lite` rescores the top 75 for semantic precision
 5. **Scoring** — `base * (1 + recency) * feedback_boost * path_boost`
 6. **Adaptive top-K** — score-cliff detection between positions 1-5
 

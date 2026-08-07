@@ -284,28 +284,63 @@ sift index [path] [flags]
 |------|-------|------|---------|-------------|
 | `--collection` | `-c` | string | | Walk this collection's root path. |
 | `--depth` | | int | -1 | Limit descent depth (`0`=root, `1`=children, `-1`=unbounded). |
+| `--orient` | | bool | | Emit compact semantic JSON; defaults to depth 1. |
 | `--json` | | bool | | Emit JSON envelope. |
 | `--markdown` | | bool | | Emit markdown tree. |
 | `--include-ignored` | | bool | | Include folders/files marked `ignore = true`. |
 | `--sections` | | bool | (auto) | Include H1/H2 outlines per file. On for JSON, off for markdown. |
-| `--summaries` | | bool | true | Include folder purpose and file summaries. |
+| `--summaries` | | bool | true | Include editorial purpose/summaries; false keeps local extractive orientation. |
 | `--path` | `-p` | string | | Glob filter applied to file paths (e.g. `docs/**`). |
 | `--since` | | string | | Only include files modified within the duration (e.g. `7d`). |
 | `--file` | | string[] | | Only include this file path (repeatable). |
 
-Format auto-detection: stdout is a TTY → `markdown`, piped → `json`.
+With `--collection`, `[path]` is collection-relative. Returned paths
+remain collection-relative for direct reuse. Format auto-detection:
+stdout is a TTY → `markdown`, piped → `json`.
 Pass `--json` or `--markdown` to override. `--json` and `--markdown` are
 mutually exclusive.
 
 **Examples:**
 
 ```bash
-sift index                                # current directory, TTY → markdown
-sift index docs --depth 1                 # only direct children
-sift index docs --json | jq .digest       # one-paragraph orientation
+sift collections --json                   # discover collection names
+sift index -c vault --orient              # semantic root + direct children
+sift index docs -c vault --orient         # drill into a branch
+sift index docs -c vault --json           # detailed subtree + line ranges
 sift index --path 'docs/**' --since 7d    # AND-combined filters
-sift index --collection vault --markdown
 ```
+
+### Compact orientation shape
+
+```json
+{
+  "schema_version": 1,
+  "collection": "vault",
+  "root": "/Users/me/vault",
+  "sub_path": "docs",
+  "digest": "docs — Architecture: Explains the system boundaries.",
+  "stats": {"folder_count": 3, "file_count": 8, "total_words": 4200},
+  "folders": [{
+    "path": "docs",
+    "purpose": "Architecture: Explains the system boundaries.",
+    "purpose_source": "extractive",
+    "children": ["architecture", "guides"],
+    "files": [{
+      "path": "docs/README.md",
+      "title": "Documentation",
+      "summary": "Explains how to navigate the project documentation.",
+      "summary_source": "extractive",
+      "topics": ["Quick start", "Concepts"],
+      "words": 640
+    }]
+  }]
+}
+```
+
+`editorial` means the text came from `sift.toml`. `extractive`,
+`headings`, and `title` are deterministic local fallbacks and never call
+an AI provider. Use `--orient --summaries=false` to ignore all editorial
+fields and inspect the strictly local extractive view.
 
 ### JSON envelope shape
 
@@ -335,13 +370,15 @@ sift index --collection vault --markdown
       "last_modified": "2026-05-01T12:14:33Z",
       "files": [
         {
-          "path": "architecture.md",
+          "path": "docs/architecture.md",
           "kind": "md",
           "bytes": 8420,
           "words": 1240,
           "mtime": "2026-04-30T18:02:11Z",
           "content_hash": "1f2a...",
           "summary": "Describes the BM25 + vector pipeline.",
+          "title": "Architecture",
+          "excerpt": "Explains the search and indexing pipeline.",
           "exists": true,
           "sections": [
             {"heading": "Data Flow", "level": 2, "start_line": 3, "end_line": 24}
@@ -360,8 +397,8 @@ from the tree. See [Folder Indexes / `sift index` deep dive](folder-indexes/sift
 ### `sift index check`
 
 Lint `sift.toml` files in a tree. No writes, no LLM calls. Reports
-missing files, parse errors, stale entries, missing summaries, orphaned
-entries, and unsupported schema versions.
+missing files, parse errors, stale entries, orphaned entries, and
+unsupported schema versions. Missing summaries are optional.
 
 ```
 sift index check [path] [flags]
@@ -374,6 +411,7 @@ sift index check [path] [flags]
 | `--markdown` | | bool | | Emit pasteable markdown checklist. |
 | `--include-ignored` | | bool | | Lint folders/files marked `ignore = true` too. |
 | `--all` | | bool | | Include non-text files (e.g. `.go`, `.py`, `.rs`) in orphan checks. |
+| `--require-summaries` | | bool | | Report empty file summaries as defects. |
 | `--path` | `-p` | string | | Glob filter applied to file paths. |
 | `--since` | | string | | Duration filter (e.g. `7d`). |
 | `--file` | | string[] | | Only include this file path (repeatable). |
@@ -395,6 +433,7 @@ or `--markdown`. `--json` and `--markdown` are mutually exclusive.
 sift index check                              # current directory
 sift index check ./docs
 sift index check --collection vault
+sift index check --collection vault --require-summaries
 sift index check ./docs --json | jq .summary
 sift index check ./docs --markdown > REPORT.md
 sift index check --path 'docs/**'
@@ -402,6 +441,28 @@ sift index check --path 'docs/**'
 
 See [Folder Indexes / overview](folder-indexes/overview.md) for what defects
 mean and how to fix them.
+
+## `sift read`
+
+Read a file, exact line range, or Markdown section without an editor or
+API call. With `--collection`, the file is collection-relative.
+
+```
+sift read <file> [flags]
+```
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--collection` | `-c` | string | | Resolve the file inside this collection. |
+| `--section` | | string | | Heading title or slug, such as `Data Flow` or `data-flow`; numeric prefixes are optional. |
+| `--start-line` | | int | 1 | First line to read. |
+| `--end-line` | | int | EOF | Last line to read. |
+| `--json` | | bool | | Emit `{file, section, start_line, end_line, content}`. |
+
+```bash
+sift read docs/architecture.md -c vault --section data-flow
+sift read docs/architecture.md -c vault --start-line 40 --end-line 80 --json
+```
 
 ## `sift feedback`
 
@@ -425,7 +486,9 @@ sift feedback abc123 --positive a,b --negative d
 
 ## `sift collections`
 
-Manage indexed collections. Run bare `sift collections` to list all.
+Manage indexed collections. Run bare `sift collections` to list all, or
+`sift collections --json` for the stable agent discovery envelope:
+`{"collections":[{"name","path","file_count","tags"}]}`.
 
 ### `sift collections add`
 

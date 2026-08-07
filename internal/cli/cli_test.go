@@ -157,6 +157,28 @@ func TestIntegrationPipeline(t *testing.T) {
 		}
 	})
 
+	t.Run("CollectionsListJSON", func(t *testing.T) {
+		cmd := NewRootCmd("test")
+		cmd.SetArgs([]string{"collections", "--json"})
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("collections --json: %v", err)
+		}
+		var env struct {
+			Collections []struct {
+				Name string `json:"name"`
+				Path string `json:"path"`
+			} `json:"collections"`
+		}
+		if err := json.Unmarshal(buf.Bytes(), &env); err != nil {
+			t.Fatalf("collections JSON: %v", err)
+		}
+		if len(env.Collections) != 1 || env.Collections[0].Name != "vault" || env.Collections[0].Path != collDir {
+			t.Fatalf("unexpected collections JSON: %+v", env.Collections)
+		}
+	})
+
 	// 4. Refresh
 	t.Run("Refresh", func(t *testing.T) {
 		cmd := NewRootCmd("test")
@@ -963,6 +985,19 @@ OAuth2 is supported for third-party integrations.`)
 		}
 		if !strings.Contains(output, "JWT") {
 			t.Fatalf("expected JWT in results: %s", output)
+		}
+	})
+
+	t.Run("UnquotedWordsFormOneQuery", func(t *testing.T) {
+		cmd := NewRootCmd("test")
+		cmd.SetArgs([]string{"search", "authentication", "JWT", "--file", authFile})
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unquoted file search: %v", err)
+		}
+		if !strings.Contains(buf.String(), `File search: "authentication JWT"`) {
+			t.Fatalf("query words were not joined: %s", buf.String())
 		}
 	})
 

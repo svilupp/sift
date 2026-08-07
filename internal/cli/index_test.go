@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"sift/internal/config"
+	"sift/internal/db"
 	"sift/internal/index"
 )
 
@@ -26,6 +28,38 @@ func runIndexCheck(t *testing.T, args ...string) (string, string, error) {
 	cmd.SetContext(context.Background())
 	err := cmd.Execute()
 	return out.String(), errBuf.String(), err
+}
+
+func runIndexRead(t *testing.T, args ...string) (string, error) {
+	t.Helper()
+	cmd := newIndexCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs(args)
+	cmd.SetContext(context.Background())
+	err := cmd.Execute()
+	return out.String(), err
+}
+
+func registerIndexCollection(t *testing.T, name, root string) {
+	t.Helper()
+	siftDir := t.TempDir()
+	t.Setenv("SIFT_DIR", siftDir)
+	dbPath, err := config.DBPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	database, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	if err := database.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.AddCollection(name, root, nil); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // seedSiftToml mirrors the test helper from internal/index, but here
@@ -212,5 +246,79 @@ func TestIndexCheck_IndexCheckExitCodeUnwrap(t *testing.T) {
 	}
 	if code := IndexCheckExitCode(nil); code != 0 {
 		t.Fatalf("expected 0 for nil, got %d", code)
+	}
+}
+
+func TestIndexOrient_CollectionRelativeDrillDown(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "docs", "architecture.md"), "# Architecture\n\nExplains how requests move through Sift locally.\n\n## Data Flow\n\nThe pipeline starts with lexical retrieval.\n")
+	writeFile(t, filepath.Join(root, "docs", "decisions", "storage.md"), "# Storage\n\nDocuments the storage layout.\n")
+	seedSiftToml(t, filepath.Join(root, "docs"), []string{"architecture.md"}, "")
+	seedSiftToml(t, filepath.Join(root, "docs", "decisions"), []string{"storage.md"}, "")
+	registerIndexCollection(t, "vault", root)
+
+	stdout, err := runIndexRead(t, "docs", "--collection", "vault", "--orient")
+	if err != nil {
+		t.Fatalf("orient: %v", err)
+	}
+	var env struct {
+		Collection string `json:"collection"`
+		Root       string `json:"root"`
+		SubPath    string `json:"sub_path"`
+		Folders    []struct {
+			Path     string   `json:"path"`
+			Children []string `json:"children"`
+			Files    []struct {
+				Path          string   `json:"path"`
+				Title         string   `json:"title"`
+				Summary       string   `json:"summary"`
+				SummarySource string   `json:"summary_source"`
+				Topics        []string `json:"topics"`
+			} `json:"files"`
+		} `json:"folders"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatalf("invalid orientation JSON: %v\n%s", err, stdout)
+	}
+	if env.Collection != "vault" || env.Root != root || env.SubPath != "docs" {
+		t.Fatalf("wrong target contract: %+v", env)
+	}
+	if len(env.Folders) != 2 { // --orient defaults to root + one level.
+		t.Fatalf("folders = %d, want 2: %s", len(env.Folders), stdout)
+	}
+	if env.Folders[0].Path != "docs" || len(env.Folders[0].Files) != 1 {
+		t.Fatalf("collection-relative paths missing: %+v", env.Folders[0])
+	}
+	file := env.Folders[0].Files[0]
+	if file.Path != "docs/architecture.md" || file.Title != "Architecture" {
+		t.Fatalf("unexpected semantic file: %+v", file)
+	}
+	if file.Summary == "" || file.SummarySource != "extractive" || len(file.Topics) == 0 {
+		t.Fatalf("local semantic fallback missing: %+v", file)
+	}
+}
+
+func TestIndexOrient_RejectsEscapeAndMarkdown(t *testing.T) {
+	root := t.TempDir()
+	registerIndexCollection(t, "vault", root)
+	if _, err := runIndexRead(t, "../outside", "--collection", "vault", "--orient"); err == nil {
+		t.Fatal("expected collection path escape to fail")
+	}
+	if _, err := runIndexRead(t, "--collection", "vault", "--orient", "--markdown"); err == nil {
+		t.Fatal("expected orient/markdown conflict to fail")
+	}
+}
+
+func TestIndexCheck_EmptySummaryRequiresExplicitFlag(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "local.md"), "# Local\n\nWorks without generated summaries.\n")
+	seedSiftToml(t, root, []string{"local.md"}, "")
+
+	if stdout, _, err := runIndexCheck(t, root, "--json"); err != nil {
+		t.Fatalf("local check should pass by default: %v\n%s", err, stdout)
+	}
+	stdout, _, err := runIndexCheck(t, root, "--json", "--require-summaries")
+	if code := IndexCheckExitCode(err); code != 2 {
+		t.Fatalf("require summaries code = %d, want 2; output=%s", code, stdout)
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"sift/internal/bm25"
 	"sift/internal/chunk"
 	"sift/internal/config"
+	"sift/internal/daemon"
 	"sift/internal/db"
 	siftlog "sift/internal/log"
 	"sift/internal/voyage"
@@ -137,6 +138,7 @@ func newConfigSetCmd() *cobra.Command {
 Valid keys:
   api.voyage_api_key          Voyage API key (enables vector search + reranking)
   api.deepinfra_api_key       DeepInfra API key (enables AI sift.toml generation)
+  api.deepinfra_priority      Send service_tier=priority to DeepInfra (default: false)
   embedding.model             Embedding model (default: voyage-4-lite)
   embedding.dimensions        Vector dimensions (default: 512)
   embedding.output_dtype      Output type: float, binary (default: binary)
@@ -144,6 +146,7 @@ Valid keys:
   reranking.model             Rerank model (default: rerank-2.5-lite)
   reranking.enabled           Enable reranking (default: true)
   reranking.top_n             Candidates to rerank (default: 20)
+  daemon.enabled              Enable the background daemon (default: true)
   chunking.rows_per_chunk     Lines per chunk (default: 40)
   chunking.overlap_rows       Overlap between chunks (default: 5)
   chunking.min_chunk_chars    Drop chunks below this (default: 50)
@@ -193,6 +196,20 @@ Examples:
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Set %s = %s\n", key, value)
+			if key == "daemon.enabled" && !cfg.Daemon.Enabled {
+				if err := daemon.Stop(defaultStopTimeout); err != nil {
+					return fmt.Errorf("configuration saved, but stop daemon: %w", err)
+				}
+				fmt.Fprintln(cmd.OutOrStdout(), "Daemon disabled and stopped; search and refresh will run in-process.")
+			} else if key == "api.voyage_api_key" && cfg.Daemon.Enabled {
+				report := daemon.GetStatus(statusProbeTimeout)
+				if report.State == daemon.StatusRunning {
+					if err := daemon.Restart(defaultStopTimeout); err != nil {
+						return fmt.Errorf("configuration saved, but restart daemon to apply Voyage key: %w", err)
+					}
+					fmt.Fprintln(cmd.OutOrStdout(), "Daemon restarted to apply the Voyage API key change.")
+				}
+			}
 			return nil
 		},
 	}
@@ -448,7 +465,10 @@ func newConfigHealthCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if _, statErr := os.Stat(blevePath); statErr == nil {
+			daemonReport := daemon.GetStatus(statusProbeTimeout)
+			if daemonReport.State == daemon.StatusRunning {
+				fmt.Fprintf(w, "[--] Bleve index: owned by running daemon (pid %d); direct check skipped\n", daemonReport.PID)
+			} else if _, statErr := os.Stat(blevePath); statErr == nil {
 				cfg, loadErr := config.Load()
 				if loadErr != nil {
 					fmt.Fprintf(w, "[!!] Bleve index: cannot load config: %v\n", loadErr)
@@ -489,7 +509,7 @@ func newConfigHealthCmd() *cobra.Command {
 			if loadErr != nil {
 				fmt.Fprintf(w, "[!!] Config load: %v\n", loadErr)
 			} else {
-				if cfg.API.VoyageAPIKey != "" {
+				if voyage.HasAPIKey(cfg.API.VoyageAPIKey) {
 					maskedKey := cfg.API.VoyageAPIKey
 					if len(maskedKey) > 8 {
 						maskedKey = maskedKey[:4] + "..." + maskedKey[len(maskedKey)-4:]
@@ -518,7 +538,9 @@ func newConfigHealthCmd() *cobra.Command {
 				totalEmbeddingsH, embedErrH := database.TotalEmbeddingCount()
 				if chunkErrH == nil && embedErrH == nil {
 					gap := totalChunksH - totalEmbeddingsH
-					if gap > 0 {
+					if !voyage.HasAPIKey(cfg.API.VoyageAPIKey) {
+						fmt.Fprintf(w, "[--] Embeddings disabled: BM25-only mode (%d/%d chunks embedded)\n", totalEmbeddingsH, totalChunksH)
+					} else if gap > 0 {
 						fmt.Fprintf(w, "[!!] Embedding gaps: %d chunks missing embeddings\n", gap)
 					} else {
 						fmt.Fprintf(w, "[OK] Embedding coverage: %d/%d chunks\n", totalEmbeddingsH, totalChunksH)
@@ -951,7 +973,7 @@ Check "sift config health" to see if there are unresolved dead letters.`,
 
 			// Check API key before attempting embed retries.
 			var voyageClient *voyage.Client
-			if cfg.API.VoyageAPIKey != "" {
+			if voyage.HasAPIKey(cfg.API.VoyageAPIKey) {
 				voyageClient = voyage.NewClient(cfg.API.VoyageAPIKey)
 				voyageClient.EmbedModel = cfg.Embedding.Model
 				voyageClient.EmbedDimensions = cfg.Embedding.Dimensions
@@ -1161,6 +1183,8 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 		cfg.API.VoyageAPIKey = value
 	case "api.deepinfra_api_key":
 		cfg.API.DeepInfraAPIKey = value
+	case "api.deepinfra_priority":
+		return setBool(&cfg.API.DeepInfraPriority, value)
 	case "embedding.model":
 		cfg.Embedding.Model = value
 	case "embedding.dimensions":
@@ -1175,6 +1199,8 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 		return setBool(&cfg.Reranking.Enabled, value)
 	case "reranking.top_n":
 		return setInt(&cfg.Reranking.TopN, value)
+	case "daemon.enabled":
+		return setBool(&cfg.Daemon.Enabled, value)
 	case "chunking.rows_per_chunk":
 		return setInt(&cfg.Chunking.RowsPerChunk, value)
 	case "chunking.overlap_rows":
@@ -1240,6 +1266,8 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 		return cfg.API.VoyageAPIKey, nil
 	case "api.deepinfra_api_key":
 		return cfg.API.DeepInfraAPIKey, nil
+	case "api.deepinfra_priority":
+		return fmt.Sprint(cfg.API.DeepInfraPriority), nil
 	case "embedding.model":
 		return cfg.Embedding.Model, nil
 	case "embedding.dimensions":
@@ -1254,6 +1282,8 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 		return fmt.Sprint(cfg.Reranking.Enabled), nil
 	case "reranking.top_n":
 		return fmt.Sprint(cfg.Reranking.TopN), nil
+	case "daemon.enabled":
+		return fmt.Sprint(cfg.Daemon.Enabled), nil
 	case "chunking.rows_per_chunk":
 		return fmt.Sprint(cfg.Chunking.RowsPerChunk), nil
 	case "chunking.overlap_rows":

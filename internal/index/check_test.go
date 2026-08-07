@@ -69,7 +69,7 @@ func TestCheck_CleanTree(t *testing.T) {
 	writeFile(t, filepath.Join(root, "beta.md"), "Beta is also a tracked file with stable content.")
 	seedSiftToml(t, root, []string{"alpha.md", "beta.md"}, "Stable summary.")
 
-	rep, err := Check(context.Background(), root, CheckOptions{})
+	rep, err := Check(context.Background(), root, CheckOptions{RequireSummary: true})
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
@@ -78,6 +78,20 @@ func TestCheck_CleanTree(t *testing.T) {
 	}
 	if len(rep.Defects) != 0 {
 		t.Fatalf("expected zero defects, got %d", len(rep.Defects))
+	}
+}
+
+func TestCheck_MissingSummaryAllowedByDefault(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "x.md"), "local index content")
+	seedSiftToml(t, root, []string{"x.md"}, "")
+
+	rep, err := Check(context.Background(), root, CheckOptions{})
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if rep.Summary.MissingSummary != 0 {
+		t.Fatalf("default local check reported missing summary: %+v", rep.Defects)
 	}
 }
 
@@ -191,7 +205,7 @@ func TestCheck_MissingSummary(t *testing.T) {
 		t.Fatalf("save: %v", err)
 	}
 
-	rep, err := Check(context.Background(), root, CheckOptions{})
+	rep, err := Check(context.Background(), root, CheckOptions{RequireSummary: true})
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}

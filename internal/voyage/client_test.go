@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -25,6 +26,36 @@ func fastRetry() *retryConfig {
 		maxRetries:     5,
 		initialBackoff: 1 * time.Millisecond,
 		maxBackoff:     10 * time.Millisecond,
+	}
+}
+
+func TestUnconfiguredClientNeverSendsRequests(t *testing.T) {
+	var requests atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	for _, key := range []string{"", "  \t\n"} {
+		client := NewClientWithBaseURL(key, srv.URL)
+		if client.Configured() {
+			t.Fatalf("Configured() = true for key %q", key)
+		}
+
+		if err := client.Preconnect(context.Background()); !errors.Is(err, ErrNotConfigured) {
+			t.Fatalf("Preconnect error = %v, want ErrNotConfigured", err)
+		}
+		if _, _, err := client.Embed(context.Background(), []string{"text"}, "query"); !errors.Is(err, ErrNotConfigured) {
+			t.Fatalf("Embed error = %v, want ErrNotConfigured", err)
+		}
+		if _, _, err := client.Rerank(context.Background(), "query", []string{"doc"}, 1); !errors.Is(err, ErrNotConfigured) {
+			t.Fatalf("Rerank error = %v, want ErrNotConfigured", err)
+		}
+	}
+
+	if got := requests.Load(); got != 0 {
+		t.Fatalf("unconfigured client sent %d HTTP request(s), want 0", got)
 	}
 }
 
